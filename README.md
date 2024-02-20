@@ -6,6 +6,7 @@ Private repository for the code Eliashberg eXtraction Using Bayesian Inference
 To install the lastest yet modifiable version of exubi:
 
     git clone git@github.com:TeetotalingTom/exubi.git
+    cd exubi/
     python3 -m pip install -e .
 
 ## Execution
