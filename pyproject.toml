@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exubi"
+dynamic = ["version"]
+authors = [{name = "exubi Developers"}]
+description = "Eliashberg eXtraction Using Bayesian Inference"
+readme = "README.md"
+urls = {Homepage = "https://github.com/TeetotalingTom/exubi"}
+classifiers = [
+    "Programming Language :: Python3",
+]
+dependencies = [
+    "igor2",
+    "jupyterlab",
+    "jupytext",
+]
+
+[tool.setuptools]
+dynamic = {version = {attr = "exubi.__version__"}}
+packages = ["exubi"]
