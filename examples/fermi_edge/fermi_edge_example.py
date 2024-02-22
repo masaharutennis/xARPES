@@ -1,23 +1,4 @@
----
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .Rmd
-      format_name: rmarkdown
-      format_version: '1.2'
-      jupytext_version: 1.16.1
-  kernelspec:
-    display_name: Python 3 (ipykernel)
-    language: python
-    name: python3
----
-
-# Fermi edge fitting example
-### In this example, we fit the Fermi edge of the Si-intercalated graphene data set, demonstrating at which kinetic energy to set the chemical potential when it has not been determined from an external reference (such as gold).
-
-```{python}
-# %load_ext autoreload
-# %autoreload 2
+import pathlib
 import numpy as np
 import matplotlib.pyplot as plt
 from igor2 import binarywave
@@ -26,15 +7,19 @@ from exubi.plotting import my_settings
 from exubi.distributions import fermi_dirac
 
 my_settings("default")
-```
 
-```{python}
+script_dir = pathlib.Path(__file__).parent.resolve()
+
 dfld = "data_sets"          # Folder containing the data
 flnm = "graphene_raw_101"   # Name of the file
 extn = ".ibw"               # Extension of the file
 tmpr = 80                   # Data temperature [K]
 
-data = binarywave.load(dfld + "/" + flnm + extn)
+data_file_path = script_dir / dfld / (flnm + extn)
+
+data = binarywave.load(str(data_file_path))
+
+# data = binarywave.load(dfld + "/" + flnm + extn)
 
 intn = data["wave"]["wData"]
 
@@ -45,9 +30,8 @@ fmin, amin = data["wave"]["wave_header"]["sfB"][0:2]
 
 angl = np.linspace(amin, amin+(anum-1)*astp, anum)
 ekin = np.linspace(fmin, fmin+(fnum-1)*fstp, fnum)
-```
 
-```{python}
+
 fdir = fermi_dirac(mu=31.7, temperature=20, background=100, integrated_weight=1000, \
         name="test_distribution")
 
@@ -56,11 +40,9 @@ ax = fig.gca()
 
 ax.plot(ekin, fdir.convolve(ekin, energy_resolution=0.05))
 plt.savefig("fermi_dirac.png")
-plt.show()
 plt.close()
-```
 
-```{python}
+
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
@@ -72,8 +54,3 @@ fig = bmap.fit_fermi_edge(mu_guess=32, background_guess=1e5, integrated_weight_g
 
 
 print("The optimised μ=" + f"{bmap.mu:.3f}" + " eV.")
-```
-
-```{python}
-
-```
