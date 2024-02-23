@@ -75,5 +75,5 @@ print("The optimised μ=" + f"{bmap.mu:.3f}" + " eV.")
 ```
 
 ```{python}
-
+bmap.plot
 ```

@@ -15,12 +15,11 @@ def my_settings(name="default"):
     mpl.rcParams["xtick.major.size"] = 4
     mpl.rcParams["xtick.minor.size"] = 2
     mpl.rcParams["xtick.major.width"] = 0.8
+    mpl.rcParams.update({"font.size": 16})
     # mpl.rcParams["ytick.major.width"] = 0.8
     # mpl.rcParams["xtick.minor.width"] = 0.8
     # mpl.rcParams["ytick.minor.width"] = 0.8
-    mpl.rcParams.update({"font.size": 16})
     # mpl.rcParams["axes.linewidth"]= 0.8
-
 
 
 def get_ax_fig_plt(ax=None, **kwargs):

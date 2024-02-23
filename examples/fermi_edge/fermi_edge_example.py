@@ -1,7 +1,7 @@
 import pathlib
 import numpy as np
 import matplotlib.pyplot as plt
-from igor2 import binarywave
+from exubi import binarywave
 from exubi import band_map
 from exubi.plotting import my_settings
 from exubi.distributions import fermi_dirac

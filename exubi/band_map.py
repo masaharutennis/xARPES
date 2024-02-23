@@ -42,6 +42,15 @@ class band_map():
         """
         self._mu=mu
 
+
+    
+    def shift_angles(self, shift):
+        """
+        Shifts the angles by the specified amount. Used to align with respect to experimentally
+        observed angles.
+        """
+        self.angles=self.angles + shift
+           
     
     @add_fig_kwargs
     def fit_fermi_edge(self, mu_guess, background_guess=0, integrated_weight_guess=1, \

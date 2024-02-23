@@ -1,39 +1,65 @@
-# exubi
+# Exubi
 Private repository for the code Eliashberg eXtraction Using Bayesian Inference
 
 ## Installation
 
-A virtual environment such as conda is recommanded.
+Instructions provided here are for Linux Ubuntu V22 or later. 
 
-    mkdir -p ~/miniconda3
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-    rm -rf ~/miniconda3/miniconda.sh
+### pip
 
-Initialize and create the new environment:
+The user is assumed to be in a pristine virtual environment, created using:
 
-    ~/miniconda3/bin/conda init bash
-    conda create --name exubi
-    sudo env "PATH=$PATH" conda update conda
-    conda install -c conda-forge numpy
-    conda install -c conda-forge matplotlib
-    conda install -c conda-forge scipy
-    pip install igor2
+	python3 -m venv <my_venv>
+	
+To be activated whenever installating/running Exubi:
 
-To install the lastest version of exubi:
+	source <my_venv>/bin/activate
 
-    git clone git@github.com:TeetotalingTom/exubi.git
-    cd exubi/
-    sudo python3 -m pip install -e .
+It is recommended to upgrade pip to the latest version:
 
-At present exubi requires JupyterLab:
+	python3 -m pip install --upgrade pip
+	
+After which the installation can be performed:
 
-    conda install -c conda-forge jupyterlab
-    conda install -c conda-forge jupytext
+	git clone git@github.com:TeetotalingTom/exubi.git
+	cd exubi/
+	python3 -m pip install -e .
+
+## conda
+
+The user is assumed to be in a pristine virtual environment provided by conda. First, download the required version for your operating system using:
+
+	https://docs.anaconda.com/free/miniconda/
+	
+For example:
+
+	wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+	bash Miniconda3-latest-Linux-x86_64.sh
+	
+Then scroll down the license agreement and answer ``yes`` to the following question:
+
+	Do you accept the license terms? [yes|no]
+	
+Followed by specifying your installation location. It is most convenient to also answer ``yes`` to the following:
+
+	You can undo this by running `conda init --reverse $SHELL`? [yes|no]
+	
+A conda base environment is then activated with ``source ~/.bashrc`` which runs the new lines appended to ``~/.bashrc``. Next, we install ``conda-build`` for developing Exubi (anwer ``y`` to questions):
+
+	conda install conda-build
+	
+Next, the following steps are executed for the installation - the exubi environment will have to be launched whenever running exubi:
+
+	git clone git@github.com:TeetotalingTom/exubi.git
+	cd exubi/
+	conda create --name exubi --file requirements.txt
+	conda activate exubi
+	conda develop .
+	
+And answer ``y`` to questions.
 
 ## Execution
 
-The Jupyter Lab can be launched using
+It is recommended to user JupyterLab to analyse data. JupyterLab is launched using:
 
 	jupyter lab
-
