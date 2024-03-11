@@ -9,7 +9,7 @@ Instructions provided here are for Linux Ubuntu V22 or later.
 
 The user will have to set up a pristine virtual environment. First, ``python3-venv`` might have to be installed:
 
-	sudo apt install python3-pip python3-venv
+	sudo apt install python3-venv
 
 Afterwards, one can activate a virtual environment named ``<my_venv>`` using:
 
