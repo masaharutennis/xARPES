@@ -1,5 +1,6 @@
+igor
 jupyterlab
 jupytext
-numpy
 matplotlib
+numpy
 scipy

@@ -62,7 +62,7 @@ Next, we install ``conda-build`` for developing Exubi (anwer ``y`` to questions)
 Finally, the following steps are executed for the installation &ndash; the ``exubi`` environment will have to be launched whenever running Exubi:
 
 	git clone git@github.com:TeetotalingTom/exubi.git
-	conda create --name exubi --file exubi/requirements.txt
+	conda create -n exubi -c defaults -c conda-forge --file requirements.txt
 	conda activate exubi
 	conda develop exubi/
 
