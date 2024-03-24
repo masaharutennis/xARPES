@@ -1,7 +1,9 @@
 __version__ = '0.1.0'
 
-import numpy as np
+try:
+    from igor2 import binarywave
+except ImportError:
+    import numpy as np
+    np.complex = np.complex128 # igor still uses this
 
-np.complex = np.complex128 # igor still uses this
-
-from igor import binarywave
+    from igor import binarywave
