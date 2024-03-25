@@ -27,7 +27,8 @@ It is recommended to upgrade pip to the latest version:
 Finally, the installation can be performed:
 
 	git clone git@github.com:TeetotalingTom/exubi.git
-	python3 -m pip install -e exubi/
+	cd exubi
+	python3 -m pip install -e .
 
 ## conda
 
@@ -62,9 +63,10 @@ Next, we install ``conda-build`` for developing Exubi (anwer ``y`` to questions)
 Finally, the following steps are executed for the installation &ndash; the ``exubi`` environment will have to be launched whenever running Exubi:
 
 	git clone git@github.com:TeetotalingTom/exubi.git
+	cd exubi
 	conda create -n exubi -c defaults -c conda-forge --file requirements.txt
 	conda activate exubi
-	conda develop exubi/
+	conda develop .
 
 Answer ``y`` to questions.
 
