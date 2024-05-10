@@ -65,7 +65,7 @@ class band_map():
         ----------
         Matplotlib-Figure
         """
-        from exubi.functions import fit_leastsq        
+        from xarpes.functions import fit_leastsq
         
         ax, fig, plt = get_ax_fig_plt(ax=ax)
         

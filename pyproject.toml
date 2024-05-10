@@ -3,19 +3,19 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "exubi"
+name = "xARPES"
 dynamic = ["version", "dependencies"]
-authors = [{name = "exubi Developers"}]
-description = "Eliashberg eXtraction Using Bayesian Inference"
+authors = [{name = "xARPES Developers"}]
+description = "Extraction from angle resolved photoemission spectra"
 readme = "README.md"
-urls = {Homepage = "https://github.com/TeetotalingTom/exubi"}
+urls = {Homepage = "https://github.com/xARPES/xARPES"}
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
 
 [tool.setuptools]
-packages = ["exubi"]
+packages = ["xarpes"]
 
 [tool.setuptools.dynamic]
-version = {attr = "exubi.__version__"}
+version = {attr = "xarpes.__version__"}
 dependencies = {file = ["requirements.txt"]}

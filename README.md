@@ -1,6 +1,6 @@
-# Exubi
+# xARPES
 
-Private repository for the code Eliashberg eXtraction Using Bayesian Inference.
+Repository for the code xARPES - extraction from angle resolved photoemission spectra.
 
 ## Installation
 
@@ -16,7 +16,7 @@ Afterwards, one can activate a virtual environment named ``<my_venv>`` using:
 
 	python3 -m venv <my_venv>
 
-It has to be activated whenever installing/running Exubi:
+It has to be activated whenever installing/running xARPES:
 
 	source <my_venv>/bin/activate
 
@@ -26,8 +26,8 @@ It is recommended to upgrade pip to the latest version:
 
 Finally, the installation can be performed:
 
-	git clone git@github.com:TeetotalingTom/exubi.git
-	cd exubi
+	git clone git@github.com:xARPES/xARPES.git
+	cd xARPES
 	python3 -m pip install -e .
 
 ## conda
@@ -56,16 +56,16 @@ Alternatively, you can answer ``no`` to the above question and activate conda wh
 
 	eval "$(/YOUR/PATH/TO/miniconda3/bin/conda shell.YOUR_SHELL_NAME hook)"
 
-Next, we install ``conda-build`` for developing Exubi (anwer ``y`` to questions):
+Next, we install ``conda-build`` for developing xARPES (anwer ``y`` to questions):
 
 	conda install conda-build
 
-Finally, the following steps are executed for the installation &ndash; the ``exubi`` environment will have to be launched whenever running Exubi:
+Finally, the following steps are executed for the installation &ndash; the ``xARPES`` environment will have to be launched whenever running xARPES:
 
-	git clone git@github.com:TeetotalingTom/exubi.git
-	cd exubi
-	conda create -n exubi -c defaults -c conda-forge --file requirements.txt
-	conda activate exubi
+	git clone git@github.com:xARPES/xARPES.git
+	cd xARPES
+	conda create -n xARPES -c defaults -c conda-forge --file requirements.txt
+	conda activate xARPES
 	conda develop .
 
 Answer ``y`` to questions.
