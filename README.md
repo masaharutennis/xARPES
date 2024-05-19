@@ -8,7 +8,7 @@ Instructions provided here are for Linux Ubuntu v22 or later.
 
 ### pip
 
-The user will have to set up a pristine virtual environment. First, ``python3-venv`` might have to be installed:
+It is highly recommended to set up a pristine virtual environment. First, ``python3-venv`` might have to be installed:
 
 	sudo apt install python3-venv
 
