@@ -27,7 +27,7 @@ xarpes_small_white.png: xarpes_small.svg
 	inkscape -w 600 -b white -o $@ $<
 
 xarpes_square.png: xarpes_small_white.png
-	convert $< -gravity center -extent 800x800 $@
+	convert $< -gravity center -extent 700x700 $@
 
 clean:
 	rm -f *.png *_small.svg
