@@ -4,8 +4,8 @@ from functools import wraps
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-def my_plot_settings(name='default'):
 
+def my_plot_settings(name='default'):
     # ml = 18 # Font size for captions
     mpl.rc('xtick', labelsize=10, direction='in')
     mpl.rc('ytick', labelsize=10, direction='in')
@@ -37,7 +37,6 @@ def get_ax_fig_plt(ax=None, **kwargs):
         figure: matplotlib figure
         plt: matplotlib pyplot module.
     """
-
     if ax is None:
         fig = plt.figure(**kwargs)
         ax = fig.gca()
@@ -55,7 +54,6 @@ def add_fig_kwargs(func):
     some sort of error/unexpected event.
     See doc string below for the list of supported options.
     """
-
     @wraps(func)
     def wrapper(*args, **kwargs):
         # pop the kwds used by the decorator.

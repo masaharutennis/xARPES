@@ -49,4 +49,4 @@ fig = bmap.fit_fermi_edge(hnuminphi_guess=32, background_guess=1e5,
                           savefig='edge_fit.png', show=True,
                           title='Fermi edge fit')
 
-print('The optimised h nu - phi=' + f'{bmap.hnuminphi:.4f}' + ' eV.')
+print('The optimised h nu - phi = ' + f'{bmap.hnuminphi:.4f}' + ' eV.')

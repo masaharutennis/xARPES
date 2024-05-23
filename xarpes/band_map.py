@@ -19,7 +19,6 @@ class band_map():
     temperature: float
         Temperature of the band map in Kelvin.
     """
-
     def __init__(self, intensities, angles, ekin, energy_resolution=None,
                  temperature=None, hnuminphi=None):
 

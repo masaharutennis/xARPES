@@ -40,7 +40,6 @@ class fermi_dirac(unique_distribution):
     ----------
 
     """
-
     def __init__(self, temperature, hnuminphi, background=0,
                  integrated_weight=1, name='fermi_dirac'):
 
