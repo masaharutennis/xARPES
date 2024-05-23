@@ -20,7 +20,9 @@ class band_map():
         Temperature of the band map in Kelvin.
     """
 
-    def __init__(self, intensities, angles, ekin, energy_resolution=None, temperature=None, hnuminphi=None):
+    def __init__(self, intensities, angles, ekin, energy_resolution=None,
+                 temperature=None, hnuminphi=None):
+
         self.intensities = intensities
         self.angles = angles
         self.ekin = ekin
@@ -31,28 +33,31 @@ class band_map():
     @property
     def hnuminphi(self):
         """
-        Returns the chemical potential corresponding to a particular kinetic energy.
+        Returns the chemical potential corresponding to a particular kinetic
+        energy.
         """
         return self._hnuminphi
 
     @hnuminphi.setter
     def hnuminphi(self, hnuminphi):
         """
-        Sets the chemical potential corresponding to a particular kinetic energy.
+        Sets the chemical potential corresponding to a particular kinetic
+        energy.
         """
         self._hnuminphi = hnuminphi
 
     def shift_angles(self, shift):
         """
-        Shifts the angles by the specified amount. Used to align with respect to experimentally
-        observed angles.
+        Shifts the angles by the specified amount. Used to align with respect to
+        experimentally observed angles.
         """
         self.angles = self.angles + shift
 
     @add_fig_kwargs
-    def fit_fermi_edge(self, hnuminphi_guess, background_guess=0, integrated_weight_guess=1, \
-                       angle_min=-np.infty, angle_max=np.infty, ekin_min=-np.infty, ekin_max=np.infty, \
-                        ax=None, **kwargs):
+    def fit_fermi_edge(self, hnuminphi_guess, background_guess=0,
+                       integrated_weight_guess=1, angle_min=-np.infty,
+                       angle_max=np.infty, ekin_min=-np.infty,
+                       ekin_max=np.infty, ax=None, **kwargs):
         """
         Plots the band map.
 
@@ -72,19 +77,28 @@ class band_map():
 
         energy_range = self.ekin[min_ekin_index:max_ekin_index]
 
-        integrated_intensity = np.trapz(self.intensities[min_ekin_index:max_ekin_index, min_angle_index:max_angle_index], axis=1)
+        integrated_intensity = np.trapz(
+            self.intensities[min_ekin_index:max_ekin_index,
+                min_angle_index:max_angle_index], axis=1)
 
-        fdir_initial = fermi_dirac(temperature=self.temperature, hnuminphi=hnuminphi_guess, background=background_guess, \
-                                   integrated_weight=integrated_weight_guess, name='Initial guess')
+        fdir_initial = fermi_dirac(temperature=self.temperature,
+                                   hnuminphi=hnuminphi_guess,
+                                   background=background_guess,
+                                   integrated_weight=integrated_weight_guess,
+                                   name='Initial guess')
 
-        parameters = np.array([hnuminphi_guess, background_guess, integrated_weight_guess])
+        parameters = np.array(
+            [hnuminphi_guess, background_guess, integrated_weight_guess])
 
         extra_args = (self.energy_resolution)
 
-        popt, pcov = fit_leastsq(parameters, energy_range, integrated_intensity, fdir_initial, extra_args)
+        popt, pcov = fit_leastsq(parameters, energy_range, integrated_intensity,
+                                 fdir_initial, extra_args)
 
-        fdir_final = fermi_dirac(temperature=self.temperature, hnuminphi=popt[0], background=popt[1], integrated_weight=popt[2], \
-                                  name='Fitted result')
+        fdir_final = fermi_dirac(temperature=self.temperature,
+                                 hnuminphi=popt[0], background=popt[1],
+                                 integrated_weight=popt[2],
+                                 name='Fitted result')
 
         self.hnuminphi = popt[0]
 
@@ -93,8 +107,14 @@ class band_map():
         ax.set_xlim([ekin_min, ekin_max])
 
         ax.plot(energy_range, integrated_intensity, label='Data')
-        ax.plot(energy_range, fdir_initial.convolve(energy_range, energy_resolution=self.energy_resolution), label=fdir_initial.name)
-        ax.plot(energy_range, fdir_final.convolve(energy_range, energy_resolution=self.energy_resolution), label=fdir_final.name)
+
+        ax.plot(energy_range, fdir_initial.convolve(energy_range,
+                energy_resolution=self.energy_resolution),
+                label=fdir_initial.name)
+
+        ax.plot(energy_range, fdir_final.convolve(energy_range,
+                energy_resolution=self.energy_resolution),
+                label=fdir_final.name)
 
         ax.legend()
 

@@ -78,7 +78,8 @@ def add_fig_kwargs(func):
             fig.suptitle(title)
 
         if size_kwargs is not None:
-            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'), **size_kwargs)
+            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'),
+                                **size_kwargs)
 
         if ax_grid is not None:
             for ax in fig.axes:
@@ -89,7 +90,8 @@ def add_fig_kwargs(func):
             if len(fig.axes) > len(tags):
                 tags = (1 + len(ascii_letters) // len(fig.axes)) * ascii_letters
             for ax, tag in zip(fig.axes, tags):
-                ax.annotate(f'({tag})', xy=(0.05, 0.95), xycoords='axes fraction')
+                ax.annotate(f'({tag})', xy=(0.05, 0.95),
+                            xycoords='axes fraction')
 
         if tight_layout:
             try:
@@ -97,7 +99,8 @@ def add_fig_kwargs(func):
             except Exception as exc:
                 # For some unknown reason, this problem shows up only on travis.
                 # https://stackoverflow.com/questions/22708888/valueerror-when-using-matplotlib-tight-layout
-                print('Ignoring Exception raised by fig.tight_layout\n', str(exc))
+                print('Ignoring Exception raised by fig.tight_layout\n',
+                      str(exc))
 
         if savefig:
             fig.savefig(savefig)
