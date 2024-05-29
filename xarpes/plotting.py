@@ -139,4 +139,6 @@ def add_fig_kwargs(func):
         # Use s
         wrapper.__doc__ = s
 
+    add_fig_kwargs.__doc__ += s
+
     return wrapper
