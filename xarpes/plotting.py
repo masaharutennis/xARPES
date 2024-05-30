@@ -1,8 +1,13 @@
 # Copyright (C) 2024 xARPES Developers
 # This program is free software under the terms of the GNU GPLv2 license.
 
-# Some routines in this file are from pymatgen/util/plotting.py.
-# Copyright (C) 2012-2024 pymatgen Development Team, including M.G. and S.P.O.
+# get_ax_fig_plt and add_fig_kwargs originate from pymatgen/util/plotting.py.
+# Copyright (C) 2011-2024 Shyue Ping Ong and the pymatgen Development Team
+# pymatgen is released under the MIT License.
+
+# See also abipy/tools/plotting.py.
+# Copyright (C) 2021 Matteo Giantomassi and the AbiPy Group
+# AbiPy is free software under the terms of the GNU GPLv2 license.
 
 """Functions related to plotting."""
 
