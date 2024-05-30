@@ -42,7 +42,7 @@ class band_map():
         self.energy_resolution = energy_resolution
         self.temperature = temperature
         self.hnuminphi = hnuminphi
-    
+
     @property
     def hnuminphi(self):
         r"""Returns the the photon energy minus the work function in eV.
@@ -107,11 +107,11 @@ class band_map():
         **kwargs : dict, optional
             Additional arguments passed on to add_fig_kwargs. See the keyword
             table below.
-            
+
         Returns
         -------
         Matplotlib-Figure
-        """        
+        """
         from xarpes.functions import fit_leastsq
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
@@ -127,7 +127,7 @@ class band_map():
         integrated_intensity = np.trapz(
             self.intensities[min_ekin_index:max_ekin_index,
                 min_angle_index:max_angle_index], axis=1)
-        
+
         fdir_initial = fermi_dirac(temperature=self.temperature,
                                    hnuminphi=hnuminphi_guess,
                                    background=background_guess,

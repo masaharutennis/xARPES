@@ -31,7 +31,7 @@ def my_plot_settings(name='default'):
 
 
 def get_ax_fig_plt(ax=None, **kwargs):
-    r"""Helper function used in plot functions supporting an optional Axes 
+    r"""Helper function used in plot functions supporting an optional Axes
     argument. If ax is None, we build the `matplotlib` figure and create the
     Axes else. We return the current active figure.
 
@@ -64,14 +64,14 @@ def add_fig_kwargs(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         # pop the kwds used by the decorator.
-        title = kwargs.pop("title", None)
-        size_kwargs = kwargs.pop("size_kwargs", None)
-        show = kwargs.pop("show", True)
-        savefig = kwargs.pop("savefig", None)
-        tight_layout = kwargs.pop("tight_layout", False)
-        ax_grid = kwargs.pop("ax_grid", None)
-        ax_annotate = kwargs.pop("ax_annotate", None)
-        fig_close = kwargs.pop("fig_close", False)
+        title = kwargs.pop('title', None)
+        size_kwargs = kwargs.pop('size_kwargs', None)
+        show = kwargs.pop('show', True)
+        savefig = kwargs.pop('savefig', None)
+        tight_layout = kwargs.pop('tight_layout', False)
+        ax_grid = kwargs.pop('ax_grid', None)
+        ax_annotate = kwargs.pop('ax_annotate', None)
+        fig_close = kwargs.pop('fig_close', False)
 
         # Call func and return immediately if None is returned.
         fig = func(*args, **kwargs)
@@ -83,7 +83,8 @@ def add_fig_kwargs(func):
             fig.suptitle(title)
 
         if size_kwargs is not None:
-            fig.set_size_inches(size_kwargs.pop("w"), size_kwargs.pop("h"), **size_kwargs)
+            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'),
+                                **size_kwargs)
 
         if ax_grid is not None:
             for ax in fig.axes:
@@ -94,7 +95,8 @@ def add_fig_kwargs(func):
             if len(fig.axes) > len(tags):
                 tags = (1 + len(ascii_letters) // len(fig.axes)) * ascii_letters
             for ax, tag in zip(fig.axes, tags):
-                ax.annotate(f"({tag})", xy=(0.05, 0.95), xycoords="axes fraction")
+                ax.annotate(f'({tag})', xy=(0.05, 0.95),
+                            xycoords='axes fraction')
 
         if tight_layout:
             try:
@@ -102,7 +104,8 @@ def add_fig_kwargs(func):
             except Exception as exc:
                 # For some unknown reason, this problem shows up only on travis.
                 # https://stackoverflow.com/questions/22708888/valueerror-when-using-matplotlib-tight-layout
-                print("Ignoring Exception raised by fig.tight_layout\n", str(exc))
+                print('Ignoring Exception raised by fig.tight_layout\n',
+                      str(exc))
 
         if savefig:
             fig.savefig(savefig)
@@ -138,7 +141,7 @@ def add_fig_kwargs(func):
 
     if wrapper.__doc__ is not None:
         # Add s at the end of the docstring.
-        wrapper.__doc__ += f"\n{doc_str}"
+        wrapper.__doc__ += f'\n{doc_str}'
     else:
         # Use s
         wrapper.__doc__ = doc_str
