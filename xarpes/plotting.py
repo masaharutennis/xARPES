@@ -28,18 +28,27 @@ def my_plot_settings(name='default'):
 
 
 def get_ax_fig_plt(ax=None, **kwargs):
-    r"""Helper function used in plot functions supporting an optional Axes
-    argument. If ax is None, we build the `matplotlib` figure and create the
-    Axes else. We return the current active figure.
+    r"""Helper function used in plot functions supporting an optional `Axes`
+    argument.
 
-    Args:
-        ax (Axes, optional): Axes object. Defaults to None.
-        kwargs: keyword arguments are passed to plt.figure if ax is not None.
+    If `ax` is `None`, we build the `matplotlib` figure and create the `Axes`.
+    Else we return the current active figure.
 
-    Returns:
-        ax: :class:`Axes` object
-        figure: matplotlib figure
-        plt: matplotlib pyplot module.
+    Parameters
+    ----------
+    ax : object
+        `Axes` object. Defaults to `None`.
+    **kwargs
+        Keyword arguments are passed to `plt.figure` if `ax` is not `None`.
+
+    Returns
+    -------
+    ax : object
+        `Axes` object.
+    figure : object
+        `matplotlib` figure.
+    plt : object
+        `matplotlib.pyplot` module.
     """
     if ax is None:
         fig = plt.figure(**kwargs)
