@@ -3,12 +3,13 @@
 # Fermi edge fitting example
 ### In this example, we fit the Fermi edge of the Si-intercalated graphene data set, demonstrating at which kinetic energy to set the chemical potential when it has not been determined from an external reference (such as gold).
 
+
 import xarpes
 import numpy as np
 import matplotlib.pyplot as plt
 from igor2 import binarywave
 
-xarpes.my_plot_settings('default')
+xarpes.plot_settings('default')
 
 dfld = 'data_sets' # Folder containing the data
 flnm = 'graphene_raw_101' # Name of the file
@@ -28,7 +29,7 @@ angl = np.linspace(amin, amin + (anum - 1) * astp, anum)
 ekin = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
 
 fdir = xarpes.fermi_dirac(hnuminphi=31.7, temperature=20, background=100,
-                          integrated_weight=1000, name='test_distribution')
+                          integrated_weight=1000)
 
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
@@ -49,4 +50,6 @@ fig = bmap.fit_fermi_edge(hnuminphi_guess=32, background_guess=1e5,
                           ax=ax, savefig='edge_fit.png', show=True,
                           title='Fermi edge fit')
 
-print('The optimised hnu - phi=' + f'{bmap.hnuminphi:.4f}' + ' eV.')
+print('The optimised h nu - phi=' + f'{bmap.hnuminphi:.4f}' + ' +/- ' + f'{bmap.hnuminphi_std:.4f}' + ' eV.')
+
+

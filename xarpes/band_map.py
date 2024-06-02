@@ -29,14 +29,16 @@ class band_map():
         1D array of kinetic energy values for the ordinate [eV]
     energy_resolution : float
         Energy resolution of the detector [eV]
-    temperature : float
+    temperature : float, None
         Temperature of the sample [K]
-    hnuminphi : float
+    hnuminphi : float, None
         Kinetic energy minus the work function [eV]
-       
+    hnuminphi_std : float, None
+        Standard deviation of kinetic energy minus work function [eV]
+
     """
     def __init__(self, intensities, angles, ekin, energy_resolution=None,
-                 temperature=None, hnuminphi=None):
+                 temperature=None, hnuminphi=None, hnuminphi_std=None):
 
         self.intensities = intensities
         self.angles = angles
@@ -44,28 +46,58 @@ class band_map():
         self.energy_resolution = energy_resolution
         self.temperature = temperature
         self.hnuminphi = hnuminphi
+        self.hnuminphi_std = hnuminphi_std
+
+        print('here')
 
     @property
     def hnuminphi(self):
-        r"""Returns the photon energy minus the work function in eV.
+        r"""Returns the photon energy minus the work function in eV if it has
+        been set, either during instantiation, with the setter, or by fitting
+        the Fermi-Dirac distribution to the integrated weight.
 
         Returns
         -------
-        hnuminphi : float 
+        hnuminphi : float, None
             Kinetic energy minus the work function [eV]
         """
         return self._hnuminphi
 
     @hnuminphi.setter
     def hnuminphi(self, hnuminphi):
-        r"""Manually sets the photon energy minus the work function in eV.
+        r"""Manually sets the photon energy minus the work function in eV if it
+        has been set; otherwise returns None.
 
         Parameters
         ----------
-        hnuminphi : float
+        hnuminphi : float, None
             Kinetic energy minus the work function [eV]
         """
         self._hnuminphi = hnuminphi
+
+    @property
+    def hnuminphi_std(self):
+        r"""Returns standard deviation of the photon energy minus the work
+        function in eV.
+
+        Returns
+        -------
+        hnuminphi_std : float
+            Standard deviation of energy minus the work function [eV]
+        """
+        return self._hnuminphi_std
+
+    @hnuminphi_std.setter
+    def hnuminphi_std(self, hnuminphi_std):
+        r"""Manually sets the standard deviation of photon energy minus the
+        work function in eV.
+
+        Parameters
+        ----------
+        hnuminphi_std : float
+            Standard deviation of energy minus the work function [eV]
+        """
+        self._hnuminphi_std = hnuminphi_std
 
     def shift_angles(self, shift):
         r"""
@@ -86,6 +118,9 @@ class band_map():
                        ekin_max=np.infty, ax=None, **kwargs):
         r"""
         Fits the Fermi edge of the band map and plots the result.
+        Also sets hnuminphi, the kinetic energy minus the work function in eV.
+        The fitting includes an energy convolution with an abscissa range
+        expanded by 5 times the energy resolution standard deviation.
 
         Parameters
         ----------
@@ -106,15 +141,18 @@ class band_map():
         ax : Matplotlib-Axes / NoneType
             Axis for plotting the Fermi edge on. Created if not provided by
             the user.
+
+        Other parameters
+        ----------------
         **kwargs : dict, optional
             Additional arguments passed on to add_fig_kwargs. See the keyword
             table below.
 
         Returns
         -------
-        Matplotlib-Figure        
-        """        
-
+        fig : Matplotlib-Figure
+            Figure containing the Fermi edge fit
+        """
         from xarpes.functions import fit_leastsq
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
@@ -151,6 +189,7 @@ class band_map():
                                  name='Fitted result')
 
         self.hnuminphi = popt[0]
+        self.hnuminphi_std = np.sqrt(np.diag(pcov))[0][0]
 
         ax.set_xlabel(r'$E_{\mathrm{kin}}$ (-)')
         ax.set_ylabel('Counts (-)')
