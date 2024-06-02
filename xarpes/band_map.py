@@ -35,11 +35,9 @@ class band_map():
         Kinetic energy minus the work function [eV]
     hnuminphi_std : float, None
         Standard deviation of kinetic energy minus work function [eV]
-
     """
     def __init__(self, intensities, angles, ekin, energy_resolution=None,
                  temperature=None, hnuminphi=None, hnuminphi_std=None):
-
         self.intensities = intensities
         self.angles = angles
         self.ekin = ekin
@@ -47,8 +45,6 @@ class band_map():
         self.temperature = temperature
         self.hnuminphi = hnuminphi
         self.hnuminphi_std = hnuminphi_std
-
-        print('here')
 
     @property
     def hnuminphi(self):
@@ -73,7 +69,7 @@ class band_map():
         hnuminphi : float, None
             Kinetic energy minus the work function [eV]
         """
-        self._hnuminphi = hnuminphi
+        self._hnuminphi = hnuminphi        
 
     @property
     def hnuminphi_std(self):

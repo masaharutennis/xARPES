@@ -13,7 +13,6 @@ class distribution:
         Non-unique name for instances, not to be modified after instantiation.
     """
     def __init__(self, name):
-
         self._name = name
 
     @property
@@ -90,6 +89,67 @@ class constant(unique_distribution):
             The value of the distribution for the abscissa equal to 0.
         """
         self._offset = x
+
+
+class linear(unique_distribution):
+    r"""Child cass for for linear distributions, used e.g., during MDC fitting.
+    The constant class is unique, only one instance should be used per task.
+
+    Parameters
+    ----------
+    offset : float
+        The value of the distribution for the abscissa equal to 0.
+    slope : float
+        The linear slope of the distribution w.r.t. the abscissa.
+    """
+    def __init__(self, slope, offset):
+        super().__init__(name='linear')
+        self._offset = offset
+        self._slope = slope
+
+    @property
+    def offset(self):
+        r"""Returns the offset of the linear distribution.
+
+        Returns
+        -------
+        offset : float
+            The value of the distribution for the abscissa equal to 0.
+        """
+        return self._offset
+
+    @offset.setter
+    def set_offset(self, x):
+        r"""Sets the offset of the linear distribution.
+
+        Parameters
+        ----------
+        offset : float
+            The value of the distribution for the abscissa equal to 0.
+        """
+        self._offset = x
+
+    @property
+    def slope(self):
+        r"""Returns the slope of the linear distribution.
+
+        Returns
+        -------
+        slope : float
+            The linear slope of the distribution w.r.t. the abscissa.
+        """
+        return self._slope
+
+    @slope.setter
+    def set_slope(self, x):
+        r"""Sets the slope of the linear distribution.
+
+        Parameters
+        ----------
+        slope : float
+            The linear slope of the distribution w.r.t. the abscissa.
+        """
+        self._slope = x
 
 
 class linear(unique_distribution):
@@ -181,9 +241,8 @@ class fermi_dirac(unique_distribution):
         Integrated weight on top of the background [counts]
     """
     def __init__(self, temperature, hnuminphi, background=0,
-                 integrated_weight=1):
-
-        super().__init__(name='fermi_dirac')
+                 integrated_weight=1, name='fermi_dirac'):
+        super().__init__(name)
         self.temperature = temperature
         self.hnuminphi = hnuminphi
         self.background = background
@@ -278,6 +337,7 @@ class fermi_dirac(unique_distribution):
                 Integrated weight on top of the background [counts]
             """
             self._integrated_weight = x
+    
 
     def __call__(self, energy_range, hnuminphi, background, integrated_weight,
                  energy_resolution):
@@ -333,7 +393,6 @@ class fermi_dirac(unique_distribution):
         -------
         evalf : ndarray
             1D array of the evaluated FD distribution [counts]
-
         """
         import numpy as np
         k_B = 8.617e-5 # Boltzmann constant [eV/K]

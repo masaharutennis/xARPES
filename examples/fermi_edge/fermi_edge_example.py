@@ -35,7 +35,7 @@ fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
 ax.plot(ekin, fdir.convolve(ekin, energy_resolution=0.05))
-plt.savefig('fermi_dirac.png')
+# plt.savefig('fermi_dirac.png')
 plt.close()
 
 fig = plt.figure(figsize=(6, 5))

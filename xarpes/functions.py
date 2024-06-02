@@ -24,9 +24,8 @@ def error_function(p, xdata, ydata, function, extra_args):
 
     Returns
     -------
-
     residual :
-
+        Residual between evaluated function and ydata
     """
     residual = function(xdata, *p, extra_args) - ydata
     return residual

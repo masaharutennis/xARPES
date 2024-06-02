@@ -148,7 +148,7 @@ def add_fig_kwargs(func):
         ================  ====================================================
 
 """
-
+        
     if wrapper.__doc__ is not None:
         # Add s at the end of the docstring.
         wrapper.__doc__ += f'\n{doc_str}'
