@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
-
-"""Convert all example notebooks (.Rmd) to simple scripts (.py)."""
-
 import os
 
-for path, folders, files in os.walk(os.path.relpath(os.path.dirname(__file__))):
+# Get the directory name safely
+base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+
+for path, folders, files in os.walk(base_dir):
     folders[:] = [name for name in folders if not name.startswith('.')]
 
     for name in files:
@@ -26,7 +25,7 @@ for path, folders, files in os.walk(os.path.relpath(os.path.dirname(__file__))):
                         pass
                     elif 'Jupyter only' in line:
                         pass
-                    elif line.replace(' ', '').startswith('#%'): # magic comment
+                    elif line.replace(' ', '').startswith('#%'):  # magic comment
                         pass
                     else:
                         text.write(line)

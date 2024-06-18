@@ -1,8 +1,0 @@
-igor2
-jupyterlab
-jupytext
-matplotlib
-numpy
-scipy
-lmfit
-xarray
