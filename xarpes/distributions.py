@@ -29,7 +29,6 @@ class distribution:
         """
         return self._name
 
-        
 class unique_distribution(distribution):
     r"""Parent class for unique distributions, to be used one at a time, e.g.,
     during the background of an MDC fit or the Fermi-Dirac distribution.
@@ -55,7 +54,6 @@ class unique_distribution(distribution):
             distributions. Not to be modified after instantiation.
         """
         return self._label
-
 
 class constant(unique_distribution):
     r"""Child class for constant distributions, used e.g., during MDC fitting.
@@ -91,7 +89,6 @@ class constant(unique_distribution):
             The value of the distribution for the abscissa equal to 0.
         """
         self._offset = x
-
 
 class linear(unique_distribution):
     r"""Child cass for for linear distributions, used e.g., during MDC fitting.
@@ -152,7 +149,6 @@ class linear(unique_distribution):
             The linear slope of the distribution w.r.t. the abscissa.
         """
         self._slope = x
-
 
 class fermi_dirac(unique_distribution):
     r"""Child class for Fermi-Dirac (FD) distributions, used e.g., during Fermi
@@ -302,7 +298,7 @@ class fermi_dirac(unique_distribution):
             1D array of the energy-convolved FD distribution [counts]
         """
         from scipy.ndimage import gaussian_filter
-        
+
         sigma_extend = 5 # Extend data range by "5 sigma"
         # Conversion from FWHM to standard deviation [-]
         fwhm_to_std = np.sqrt(8 * np.log(2))
@@ -332,7 +328,7 @@ class fermi_dirac(unique_distribution):
         -------
         evalf : ndarray
             1D array of the evaluated FD distribution [counts]
-        """        
+        """
         k_B = 8.617e-5 # Boltzmann constant [eV/K]
         k_BT = self.temperature * k_B
         evalf = (self.integrated_weight
@@ -359,7 +355,7 @@ class fermi_dirac(unique_distribution):
             1D array of the energy-convolved FD distribution [counts]
         """
         from scipy.ndimage import gaussian_filter
-        
+
         sigma_extend = 5 # Extend data range by "5 sigma"
         # Conversion from FWHM to standard deviation [-]
         fwhm_to_std = np.sqrt(8 * np.log(2))
@@ -372,7 +368,6 @@ class fermi_dirac(unique_distribution):
         evalf = gaussian_filter(self.evaluate(extend),
                                 sigma=estep)[enumb:-enumb]
         return evalf
-
 
 class non_unique_distribution(distribution):
     r"""Parent class for unique distributions, to be used one at a time, e.g.,
@@ -399,7 +394,6 @@ class non_unique_distribution(distribution):
             distributions. Not to be modified after instantiation.
         """
         return self._label
-
 
 class dispersion(distribution):
     r"""Dispersions are assumed to be unique, so they need an index.
@@ -453,13 +447,12 @@ class dispersion(distribution):
         """
         self._broadening = x
 
-
 # class spectral_linear(dispersion):
 #     r"""Class for the linear dispersion spectral function"""
 #     def __init__(self, amplitude, center, broadening, name, index):
 #         super().__init__(amplitude=amplitude, center=center,
 #                          broadening=broadening, name=name, index=index)
-    
+
 #     def result(self, x):
 #         r"""
 #         """
@@ -468,10 +461,9 @@ class dispersion(distribution):
 #               - np.sin(self.center*dtor))**2 + self.broadening**2)
 #         return evalf
 
-
 # class spectral_linear(dispersion):
 #     r"""Class for the linear dispersion spectral function"""
-#     def __init__(self, amplitude, center, broadening, bottom, side, name, 
+#     def __init__(self, amplitude, center, broadening, bottom, side, name,
 #                  index):
 #         super()__init__(amplitude=amplitude, center=center,
 #                          broadening=broadening, name=name, index=index)
@@ -495,11 +487,11 @@ class dispersion(distribution):
 #         r"""
 #         """
 #         return self._side
-    
+
 #     def result(self, x):
 #         r"""
 #         """
 #         dtor = np.pi/180
 #         evalf = self.amplitude / np.pi * self.broadening / (((np.sin(x*dtor)
 #               - np.sin(self.bottom*dtor))**2 - np.sin(self.center*dtor)**2)**2
-#               + self.broadening**2)    
+#               + self.broadening**2)
