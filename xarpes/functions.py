@@ -29,6 +29,7 @@ def error_function(p, xdata, ydata, function, extra_args):
     residual = function(xdata, *p, extra_args) - ydata
     return residual
 
+
 def fit_leastsq(p0, xdata, ydata, function, extra_args):
     r"""Wrapper arround scipy.optimize.leastsq.
 
@@ -76,6 +77,7 @@ def fit_leastsq(p0, xdata, ydata, function, extra_args):
 
     return pfit_leastsq, perr_leastsq
 
+
 def download_examples():
     """Downloads the examples folder from the xARPES code only if it does not
     already exist. Prints executed steps and a final cleanup/failure message.
@@ -90,6 +92,7 @@ def download_examples():
     import os
     import shutil
     import io
+    import jupytext
 
     repo_url = 'https://github.com/xARPES/xARPES_examples'
     output_dir = '.' # Directory from which the function is called
@@ -116,16 +119,21 @@ def download_examples():
 
         # Path to the extracted main folder
         main_folder_path = os.path.join(output_dir,
-                repo_parts.split('/')[-1]
-                + '-main')
+                repo_parts.split('/')[-1] + '-main')
         examples_path = os.path.join(main_folder_path, 'examples')
 
         # Move the 'examples' directory to the target location
         if os.path.exists(examples_path):
             shutil.move(examples_path, final_examples_path)
             print(f"'examples' subdirectory moved to {final_examples_path}")
-        else:
-            print("'examples' subdirectory not found in the repository.")
+            # Convert all .Rmd files in the examples directory to .ipynb and delete the .Rmd files
+            for dirpath, dirnames, filenames in os.walk(final_examples_path):
+                for filename in filenames:
+                    if filename.endswith('.Rmd'):
+                        full_path = os.path.join(dirpath, filename)
+                        jupytext.write(jupytext.read(full_path), full_path.replace('.Rmd', '.ipynb'))
+                        os.remove(full_path)  # Deletes the .Rmd file after conversion
+                        print(f"Converted and deleted {full_path}")      
 
         # Remove the rest of the extracted content
         shutil.rmtree(main_folder_path)
