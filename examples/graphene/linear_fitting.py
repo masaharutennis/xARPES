@@ -12,11 +12,23 @@ from igor2 import binarywave
 
 xarpes.plot_settings('default')
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-dfld = 'data_sets' # Folder containing the data
-flnm = 'graphene_raw_101' # Name of the file
-extn = '.ibw' # Extension of the file
-tmpr = 80 # Data temperature [K]
+try:
+    # This block checks if the script is running in an IPython environment
+    cfg = get_ipython().config
+    script_dir = os.getcwd()
+except:
+    try:
+        # This should work if we're running as a standalone script and __file__ is defined
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+    except NameError:
+        # If __file__ isn't defined, fall back to the current working directory (less reliable)
+        script_dir = os.getcwd()
+
+
+dfld = 'data_sets'  # Folder containing the data
+flnm = 'graphene_raw_101'  # Name of the file
+extn = '.ibw'  # Extension of the file
+tmpr = 80  # Data temperature [K]
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 data = binarywave.load(data_file_path)
