@@ -142,7 +142,7 @@ def add_fig_kwargs(func):
     # Add docstring to the decorated method.
     doc_str = """\n\n
 
-        notes
+        Notes
         -----
 
         Keyword arguments controlling the display of the figure:
