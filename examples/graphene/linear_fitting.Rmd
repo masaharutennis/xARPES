@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.15.2
+      jupytext_version: 1.16.2
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -19,34 +19,25 @@ jupyter:
 # %load_ext autoreload
 # %autoreload 2
 
-import os
 import xarpes
-import numpy as np
 import matplotlib.pyplot as plt
-from igor2 import binarywave
 
 xarpes.plot_settings('default')
 ```
 
 ```{python}
-try:
-    # This block checks if the script is running in an IPython environment
-    cfg = get_ipython().config
-    script_dir = os.getcwd()
-except:
-    try:
-        # This should work if we're running as a standalone script 
-        # and __file__ is defined
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-    except NameError:
-        # If __file__ isn't defined, fall back to current working directory
-        script_dir = os.getcwd()
+script_dir = xarpes.set_script_dir()
 
 dfld = 'data_sets'  # Folder containing the data
 flnm = 'graphene_raw_101'  # Name of the file
 extn = '.ibw'  # Extension of the file
 tmpr = 80  # Data temperature [K]
 
+# These three packages no longer have to be loaded once data is generated
+# inside the band map class
+import numpy as np 
+from igor2 import binarywave
+import os
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 data = binarywave.load(data_file_path)
 
@@ -62,11 +53,14 @@ ekin = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
 ```
 
 ```{python}
+import importlib
+importlib.reload(xarpes)
+
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
 bmap = xarpes.band_map(intensities=intn, angles=angl, ekin=ekin,
-                       energy_resolution=0.01, angular_resolution=0.1,
+                       energy_resolution=0.01, angle_resolution=0.1,
                        temperature=80)
 
 fig = bmap.fit_fermi_edge(hnuminphi_guess=32, background_guess=1e5,
@@ -75,35 +69,101 @@ fig = bmap.fit_fermi_edge(hnuminphi_guess=32, background_guess=1e5,
                           ax=ax, show=True,
                           title='Fermi edge fit')
 
-
 print('The optimised h nu - phi=' + f'{bmap.hnuminphi:.4f}' + ' +/- '
       + f'{bmap.hnuminphi_std:.4f}' + ' eV.')
 ```
 
 ```{python}
-fig = bmap.plot_band_map()
+fig = bmap.plot()
 ```
 
 ```{python}
-angle_min = 1
-angle_max = 10
-energy_value = 32.0107
+angle_min = 0
+angle_max = 1e6
+en_val = 32.0107
+energy_range = [31.9, 32.1]
 
-mdc = xarpes.MDCs(*bmap.slice(angle_min, angle_max, energy_value))
-fig = mdc.plot()
+mdcs = xarpes.MDCs(*bmap.slicing(angle_min, angle_max, energy_value=en_val))
+
+fig = plt.figure(figsize=(6, 5))
+ax = fig.gca()
+
+fig = mdcs.plot(ax=ax, show=False)
 ```
 
 ```{python}
-distributions = [xarpes.constant(offset=10),
-                 xarpes.linear(offset=5, slope=-2, name='something_else')]
+import importlib
+importlib.reload(xarpes)
+
+angle_min = 0
+angle_max = 1e6
+en_val = 32.0107
+
+mdcs = xarpes.MDCs(*bmap.slicing(angle_min, angle_max, energy_value=en_val))
+new_range = mdcs.angles
+
+fig = plt.figure(figsize=(6, 5))
+ax = fig.gca()
+
+line1 = xarpes.spectral_linear(amplitude=500, peak=7.5, broadening=0.01, name="Linear test", index="1")
+line2 = xarpes.spectral_linear(amplitude=600, peak=5.5, broadening=0.02, name="Linear test", index="2")
+
+line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False)
+line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False)
+fig = mdcs.plot(ax=ax)
 ```
 
 ```{python}
-distributions = [
-# xarpes.constant(offset=5e3),
-# xarpes.spectral_quadratic(amp=450, cen=-7.0, gam=0.002, kmin=-0.306, ind="1"),
-# xarpes.spectral_linear(amp=200, cen=-32, gam=0.005, ind="1"),
-]
+dist_list = xarpes.distribution_list([
+xarpes.linear(offset=2.2e3, slope=-65),
+xarpes.spectral_linear(amplitude=450, peak=7.4, broadening=0.012, name='Linear_test', index='1'),
+# xarpes.spectral_linear(amplitude=60, peak=4.2, broadening=0.018, name='Linear_test', index='2'),
+xarpes.spectral_quadratic(amplitude=20, peak=5.5, center_wavevector=0, broadening=0.005, 
+                         side='right', name='Quadratic_test', index='1')
+])
+
+fig = mdcs.initial_guess(distribution_list=dist_list())
+```
+
+```{python}
+dist_list = xarpes.distribution_list([
+xarpes.linear(offset=2.2e3, slope=-65),
+xarpes.spectral_linear(amplitude=450, peak=7.4, broadening=0.012, name='Linear_test', index='1'),
+# xarpes.spectral_linear(amplitude=60, peak=4.2, broadening=0.018, name='Linear_test', index='2'),
+xarpes.spectral_quadratic(amplitude=20, peak=4.5, center_wavevector=0, broadening=0.005, 
+                         side='right', name='Quadratic_test', index='1')
+])
+
+
+mat_el = lambda x, scal, brew, **kwargs: scal * x + brew
+mat_args = {
+    'scal' : 0.03,
+    'brew' : 1.0,
+}
+
+fig = mdcs.initial_guess(distribution_list=dist_list(), matrix_element=mat_el, matrix_args=mat_args)
+
+new_distributions, new_mat_args, covariance_matrix = mdcs.fit(distribution_list=dist_list(),
+                                    matrix_element=mat_el, matrix_args=mat_args)
+
+fig = mdcs.initial_guess(distribution_list=new_distributions, matrix_element=mat_el, matrix_args=new_mat_args)
+```
+
+```{python}
+change = xarpes.spectral_linear(amplitude=500, peak=7.5, broadening=0.01, name="Linear_test", index="1")
+
+change.broadening = 0.02
+
+print(change.broadening)
+```
+
+```{python}
+add = lambda x: np.sin(x)**2
+
+import numpy as np
+xrange = np.linspace(-np.pi/2, np.pi/2, 100)
+
+plt.plot(xrange, add(xrange))
 ```
 
 ```{python}

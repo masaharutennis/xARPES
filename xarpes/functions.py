@@ -5,7 +5,89 @@
 
 import numpy as np
 
-def error_function(p, xdata, ydata, function, extra_args):
+# Physical constants, default parameters
+fwhm_to_std = np.sqrt(8 * np.log(2)) # Convert FWHM to std [-]
+sigma_extend = 5 # Extend data range by "5 sigma"
+
+
+def build_distributions(distributions, parameters):
+    r"""TBD
+    """
+    for dist in distributions:
+        if dist.class_name == 'constant':
+            dist.offset = parameters['offset_' + dist.label].value
+        elif dist.class_name == 'linear':
+            dist.offset = parameters['offset_' + dist.label].value
+            dist.slope = parameters['slope_' + dist.label].value
+        elif dist.class_name == 'spectral_linear':
+            dist.amplitude = parameters['amplitude_' + dist.label].value
+            dist.peak = parameters['peak_' + dist.label].value
+            dist.broadening = parameters['broadening_' + dist.label].value
+        elif dist.class_name == 'spectral_quadratic':
+            dist.amplitude = parameters['amplitude_' + dist.label].value
+            dist.peak = parameters['peak_' + dist.label].value
+            dist.broadening = parameters['broadening_' + dist.label].value
+    return distributions
+
+
+def construct_parameters(distribution_list, matrix_args=None):
+    r"""TBD
+    """
+    from lmfit import Minimizer, Parameters
+    
+    parameters = Parameters()
+    
+    for dist in distribution_list:
+        if dist.class_name == 'constant':
+            parameters.add(name='offset_' + dist.label, value=dist.offset)
+        elif dist.class_name == 'linear':
+            parameters.add(name='offset_' + dist.label, value=dist.offset)
+            parameters.add(name='slope_' + dist.label, value=dist.slope)
+        elif dist.class_name == 'spectral_linear':
+            parameters.add(name='amplitude_' + dist.label, value=dist.amplitude,
+                 min=0)
+            parameters.add(name='peak_' + dist.label, value=dist.peak)
+            parameters.add(name='broadening_' + dist.label, value=dist.broadening,
+                 min=0)
+        elif dist.class_name == 'spectral_quadratic':
+            parameters.add(name='amplitude_' + dist.label, value=dist.amplitude,
+                 min=0)
+            parameters.add(name='peak_' + dist.label, value=dist.peak)
+            parameters.add(name='broadening_' + dist.label, value=dist.broadening,
+                 min=0)
+            
+    if matrix_args is not None:
+        for key, value in matrix_args.items():
+            parameters.add(name=key, value=value)
+    return parameters
+
+
+def residual(parameters, xdata, ydata, angle_resolution, distributions,
+             kinetic_energy, hnuminphi, matrix_element=None):
+    r"""
+    """
+    from scipy.ndimage import gaussian_filter
+    
+    distributions = build_distributions(distributions, parameters)
+
+    extend, step, numb = extend_function(xdata, angle_resolution)
+    
+    model = np.zeros_like(extend)
+    for dist in distributions:
+        if dist.class_name == 'spectral_quadratic': 
+            model += dist.evaluate(extend, kinetic_energy,
+                                  hnuminphi)
+        else:
+            model += dist.evaluate(extend)
+            
+    if matrix_element is not None:
+        model *= matrix_element(extend, **parameters)
+            
+    model = gaussian_filter(model, sigma=step)[numb:-numb if numb else None]      
+    return model - ydata
+
+
+def error_function(p, xdata, ydata, function, resolution, extra_args):
     r"""The error function used inside the fit_leastsq function.
 
     Parameters
@@ -26,11 +108,29 @@ def error_function(p, xdata, ydata, function, extra_args):
     residual :
         Residual between evaluated function and ydata
     """
-    residual = function(xdata, *p, extra_args) - ydata
+    if resolution:
+        from scipy.ndimage import gaussian_filter
+        extend, step, numb = extend_function(xdata, resolution)
+        residual = gaussian_filter(function(extend, *p, *extra_args), \
+                   sigma=step)[numb:-numb if numb else None] - ydata
+    else:
+        residual = function(xdata, *p, *extra_args) - ydata
     return residual
 
 
-def fit_leastsq(p0, xdata, ydata, function, extra_args):
+def extend_function(abscissa_range, abscissa_resolution): 
+    r"""TBD
+    """
+    step_size = np.abs(abscissa_range[1] - abscissa_range[0])
+    step = abscissa_resolution / (step_size * fwhm_to_std)
+    numb = int(sigma_extend * step)
+    extend = np.linspace(abscissa_range[0]  - numb * step_size,
+                         abscissa_range[-1] + numb * step_size,
+                         len(abscissa_range) + 2 * numb)
+    return extend, step, numb
+
+
+def fit_leastsq(p0, xdata, ydata, function, resolution=None, *extra_args):
     r"""Wrapper arround scipy.optimize.leastsq.
 
     Parameters
@@ -56,11 +156,11 @@ def fit_leastsq(p0, xdata, ydata, function, extra_args):
     from scipy.optimize import leastsq
 
     pfit, pcov, infodict, errmsg, success = leastsq(
-        error_function, p0, args=(xdata, ydata, function, extra_args),
+        error_function, p0, args=(xdata, ydata, function, resolution, extra_args),
         full_output=1)
 
     if (len(ydata) > len(p0)) and pcov is not None:
-        s_sq = (error_function(pfit, xdata, ydata, function,
+        s_sq = (error_function(pfit, xdata, ydata, function, resolution,
                                extra_args) ** 2).sum() / (len(ydata) - len(p0))
         pcov = pcov * s_sq
     else:
@@ -100,8 +200,8 @@ def download_examples():
     # Check if 'examples' directory already exists
     final_examples_path = os.path.join(output_dir, 'examples')
     if os.path.exists(final_examples_path):
-        print("Warning: 'examples' folder already exists. \
-        No download will be performed.")
+        print("Warning: 'examples' folder already exists. " +
+        "No download will be performed.")
         return 1 # Exit the function if 'examples' directory exists
 
     # Proceed with download if 'examples' directory does not exist
@@ -126,14 +226,16 @@ def download_examples():
         if os.path.exists(examples_path):
             shutil.move(examples_path, final_examples_path)
             print(f"'examples' subdirectory moved to {final_examples_path}")
-            # Convert all .Rmd files in the examples directory to .ipynb and delete the .Rmd files
+            # Convert all .Rmd files in the examples directory to .ipynb
+            # and delete the .Rmd files
             for dirpath, dirnames, filenames in os.walk(final_examples_path):
                 for filename in filenames:
                     if filename.endswith('.Rmd'):
                         full_path = os.path.join(dirpath, filename)
-                        jupytext.write(jupytext.read(full_path), full_path.replace('.Rmd', '.ipynb'))
-                        os.remove(full_path)  # Deletes the .Rmd file after conversion
-                        print(f"Converted and deleted {full_path}")      
+                        jupytext.write(jupytext.read(full_path), \
+                                       full_path.replace('.Rmd', '.ipynb'))
+                        os.remove(full_path) # Deletes .Rmd file afterwards
+                        print(f'Converted and deleted {full_path}')
 
         # Remove the rest of the extracted content
         shutil.rmtree(main_folder_path)
@@ -143,3 +245,23 @@ def download_examples():
         print(f'Failed to download the repository. Status code: \
                 {response.status_code}')
         return 1
+
+def set_script_dir():
+    r"""This function sets the directory such that the xARPES code can be
+    executed either inside IPython environments or as .py scripts from
+    arbitrary locations.
+    """
+    import os
+    try:
+        # This block checks if the script is running in an IPython environment
+        cfg = get_ipython().config
+        script_dir = os.getcwd()
+    except:
+        try:
+            # This should work if we're running as a standalone script 
+            # and __file__ is defined
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+        except NameError:
+            # If __file__ isn't defined, fall back to current working directory
+            script_dir = os.getcwd()
+    return script_dir

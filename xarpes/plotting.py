@@ -107,7 +107,8 @@ def add_fig_kwargs(func):
                 fig.tight_layout()
             except Exception as exc:
                 # For some unknown reason, this problem shows up only on travis.
-                # https://stackoverflow.com/questions/22708888/valueerror-when-using-matplotlib-tight-layout
+                # https://stackoverflow.com/questions/22708888/
+                #valueerror-when-using-matplotlib-tight-layout
                 print('Ignoring Exception raised by fig.tight_layout\n',
                       str(exc))
 

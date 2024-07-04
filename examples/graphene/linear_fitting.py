@@ -3,7 +3,7 @@
 # Fermi edge fitting example
 ### In this example, we fit a linear dispersion to one of the graphene bands.
 
-import matplotlib as mpl                                        
+import matplotlib as mpl
 mpl.use('Qt5Agg')
 
 import os
@@ -20,17 +20,17 @@ try:
     script_dir = os.getcwd()
 except:
     try:
-        # This should work if we're running as a standalone script 
+        # This should work if we're running as a standalone script
         # and __file__ is defined
         script_dir = os.path.dirname(os.path.abspath(__file__))
     except NameError:
         # If __file__ isn't defined, fall back to current working directory
         script_dir = os.getcwd()
 
-dfld = 'data_sets'  # Folder containing the data
-flnm = 'graphene_raw_101'  # Name of the file
-extn = '.ibw'  # Extension of the file
-tmpr = 80  # Data temperature [K]
+dfld = 'data_sets' # Folder containing the data
+flnm = 'graphene_raw_101' # Name of the file
+extn = '.ibw' # Extension of the file
+tmpr = 80 # Data temperature [K]
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 data = binarywave.load(data_file_path)
@@ -58,7 +58,6 @@ fig = bmap.fit_fermi_edge(hnuminphi_guess=32, background_guess=1e5,
                           ax=ax, show=True,
                           title='Fermi edge fit')
 
-
 print('The optimised h nu - phi=' + f'{bmap.hnuminphi:.4f}' + ' +/- '
       + f'{bmap.hnuminphi_std:.4f}' + ' eV.')
 
@@ -79,5 +78,3 @@ distributions = [
 # xarpes.spectral_quadratic(amp=450, cen=-7.0, gam=0.002, kmin=-0.306, ind="1"),
 # xarpes.spectral_linear(amp=200, cen=-32, gam=0.005, ind="1"),
 ]
-
-

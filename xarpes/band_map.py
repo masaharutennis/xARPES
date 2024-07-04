@@ -14,43 +14,176 @@
 import numpy as np
 
 from .plotting import get_ax_fig_plt, add_fig_kwargs
-from .functions import fit_leastsq
+from .functions import fit_leastsq, extend_function
 from .distributions import fermi_dirac
+
 
 class MDCs():
     r"""
     """
-    def __init__(self, intensities, angles, ekin, angular_resolution):
+    def __init__(self, intensities, angles, ekin, angle_resolution, hnuminphi):
         self.intensities = intensities
         self.angles = angles
         self.ekin = ekin
-        self.angular_resolution = angular_resolution
-
-    # @add_fig_kwargs
-    # def fit(self):
-    #     r"""
-    #     """
-    #     return 0
-
-    # @add_fig_kwargs
-    # def fit_fermi_edge(self, hnuminphi_guess, background_guess=0.0,
-    #                    integrated_weight_guess=1.0, angle_min=-np.inf,
-    #                    angle_max=np.inf, ekin_min=-np.inf,
-    #                    ekin_max=np.inf, ax=None, **kwargs):
-
-    @add_fig_kwargs
-    def plot(self, ax=None, **kwargs):
+        self.angle_resolution = angle_resolution
+        self.hnuminphi = hnuminphi
+                
+    @property
+    def ekin(self):
         r"""
         """
+        return self._ekin
+    
+    @ekin.setter
+    def ekin(self, x):
+        r"""
+        """
+        self._ekin = x
+    
+    @property
+    def intensities(self):
+        r"""
+        """
+        return self._intensities
+    
+    @intensities.setter
+    def intensities(self, x):
+        r"""
+        """
+        self._intensities = x
+    
+    def energy_check(self, energy_value):
+        r"""
+        """
+        if energy_value is None and len(np.shape(self.intensities)) > 1:
+            raise ValueError('Multiple MDCs. Please provide the nearest energy ' +
+                         'value for which to plot an MDC.')
+            
+        if energy_value is not None and len(np.shape(self.intensities)) > 1:
+            energy_index = np.abs(self.ekin - energy_value).argmin()
+            counts = self.intensities[energy_index, :]
+        else:
+            counts = self.intensities
+        
+        if energy_value is not None and len(np.shape(self.intensities)) == 1:
+            print('There is only a single MDC. The provided energy value ' +
+                  'will be ignored.')
+        return counts
+    
+    @add_fig_kwargs
+    def plot(self, energy_value=None, ax=None, **kwargs):
+        r"""
+        TBD
+        """     
+        counts = self.energy_check(energy_value)
+        
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
-        ax.scatter(self.angles, self.intensities)
+        ax.scatter(self.angles, counts, label='data')
 
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('Counts (-)')
 
+        ax.legend()
+
+        return fig
+    
+    @add_fig_kwargs
+    def initial_guess(self, distribution_list, energy_value=None, \
+                      matrix_element=None, matrix_args=None, ax=None, **kwargs):
+        r"""
+        """
+        from scipy.ndimage import gaussian_filter
+        
+        counts = self.energy_check(energy_value)
+        
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+        
+        ax.set_xlabel('Angle ($\degree$)')
+        ax.set_ylabel('Counts (-)')
+
+        # Modify this when mdcs is a larger collection
+        kinetic_energy = self.ekin        
+
+        ax.scatter(self.angles, counts, label='data')
+        
+        # It might be possible to simplify this code by calling the distribution_list
+        # plotting functionality, depending on the possibility of passing on
+        # add_fig_kwargs.
+        extend, step, numb = extend_function(self.angles, self.angle_resolution)
+        
+        total_result = np.zeros(np.shape(extend))
+        
+        for dist in distribution_list:
+            if dist.class_name == 'spectral_quadratic':
+                if (dist.center_angle is not None) and (kinetic_energy is \
+                    None or hnuminphi is None):
+                    raise ValueError('Spectral quadratic function is ' + 
+                    'defined in terms of a center angle. Please provide ' +
+                    'a kinetic energy and hnuminphi.')
+                extended_result = dist.evaluate(extend, \
+                                            kinetic_energy, self.hnuminphi)
+            else:
+                extended_result = dist.evaluate(extend)
+            
+            if matrix_element is not None:
+                extended_result *= matrix_element(extend, **matrix_args)
+                                                  
+            total_result += extended_result 
+            individual_result = gaussian_filter(extended_result, \
+                                    sigma=step)[numb:-numb]
+           
+            ax.plot(self.angles, individual_result, label=dist.label)    
+                
+        final_result = gaussian_filter(total_result, \
+                                sigma=step)[numb:-numb]                
+                
+        residual = counts - final_result
+        
+        ax.scatter(self.angles, residual, label='Residual')
+        ax.legend()
+        
         return fig
 
+    @add_fig_kwargs
+    def fit(self, distribution_list, matrix_element=None, matrix_args=None, \
+            ax=None, **kwargs):
+        r"""
+        """
+        from .functions import construct_parameters, build_distributions, \
+        residual
+        from scipy.ndimage import gaussian_filter
+        from lmfit import Minimizer
+        
+        # Modify this when mdcs is a larger collection
+        kinetic_energy = self.ekin
+        
+        if matrix_element is not None:
+            parameters = construct_parameters(distribution_list, matrix_args)
+            mini = Minimizer(residual, parameters, fcn_args=(self.angles,
+            self.intensities, self.angle_resolution, distribution_list, \
+                    kinetic_energy, self.hnuminphi, matrix_element))                   
+
+        else:
+            parameters = construct_parameters(distribution_list)
+            mini = Minimizer(residual, parameters, fcn_args=(self.angles,
+            self.intensities, self.angle_resolution, distribution_list, \
+                                kinetic_energy, self.hnuminphi))            
+        
+        outcome = mini.minimize("least_squares")
+        pcov = outcome.covar
+        
+        new_distributions = build_distributions(distribution_list, outcome.params)
+        
+        if matrix_element is not None: # Get the matrix element values
+            new_matrix_args = {}
+            for key in matrix_args:
+                new_matrix_args[key]= outcome.params[key].value                            
+            return new_distributions, new_matrix_args, pcov
+        else:
+            return new_distributions, pcov
+    
+    
 class band_map():
     r"""Class for the band map from the ARPES experiment.
 
@@ -59,11 +192,11 @@ class band_map():
     intensities : ndarray
         2D array of counts for given (E,k) or (E,angle) pairs [counts]
     angles : ndarray
-        1D array of angular values for the abscissa [degrees]
+        1D array of angle values for the abscissa [degrees]
     ekin : ndarray
         1D array of kinetic energy values for the ordinate [eV]
-    angular_resolution : float, None
-        Angular resolution of the detector [degrees]
+    angle_resolution : float, None
+        Angle resolution of the detector [degrees]
     energy_resolution : float, None
         Energy resolution of the detector [eV]
     temperature : float, None
@@ -74,13 +207,13 @@ class band_map():
         Standard deviation of kinetic energy minus work function [eV]
     """
     def __init__(self, intensities, angles, ekin, energy_resolution=None,
-                 angular_resolution=None, temperature=None, hnuminphi=None,
+                 angle_resolution=None, temperature=None, hnuminphi=None,
                  hnuminphi_std=None):
         self.intensities = intensities
         self.angles = angles
         self.ekin = ekin
         self.energy_resolution = energy_resolution
-        self.angular_resolution = angular_resolution
+        self.angle_resolution = angle_resolution
         self.temperature = temperature
         self.hnuminphi = hnuminphi
         self.hnuminphi_std = hnuminphi_std
@@ -146,7 +279,7 @@ class band_map():
         """
         self.angles = self.angles + shift
 
-    def slice(self, angle_min, angle_max, energy_value):
+    def slicing(self, angle_min, angle_max, energy_value=None, energy_range=None):
         r"""
         Parameters
         ----------
@@ -164,20 +297,34 @@ class band_map():
         mdcs :
             Array of size nxm containing the MDC intensities
         """
-
-        energy_index = np.abs(self.ekin - energy_value).argmin()
+  
+        if (energy_value is None and energy_range is None) or \
+        (energy_value is not None and energy_range is not None):
+            raise ValueError('Please provide either energy_value or ' +
+            'energy_range.')
+            
         angle_min_index = np.abs(self.angles - angle_min).argmin()
-        angle_max_index = np.abs(self.angles - angle_max).argmin()
-
-        angle_range = self.angles[angle_min_index:angle_max_index + 1]
-        energy_range = self.ekin[energy_index]
-        mdcs = self.intensities[energy_index,
-               angle_min_index:angle_max_index + 1]
-
-        return mdcs, angle_range, energy_range, self.angular_resolution
+        angle_max_index = np.abs(self.angles - angle_max).argmin()      
+        angle_range_out = self.angles[angle_min_index:angle_max_index + 1]        
+        
+        if energy_value:
+            energy_index = np.abs(self.ekin - energy_value).argmin()
+            energy_range_out = self.ekin[energy_index]
+            mdcs = self.intensities[energy_index,
+                   angle_min_index:angle_max_index + 1]
+            
+        if energy_range:
+            energy_indices = np.where((self.ekin >= np.min(energy_range)) 
+                                      & (self.ekin <= np.max(energy_range)))[0]
+            energy_range_out = self.ekin[energy_indices]
+            mdcs = self.intensities[energy_indices, 
+                                    angle_min_index:angle_max_index + 1]
+            
+        return mdcs, angle_range_out, energy_range_out, self.angle_resolution, \
+               self.hnuminphi
 
     @add_fig_kwargs
-    def plot_band_map(self, ax=None, **kwargs):
+    def plot(self, ax=None, **kwargs):
         r"""Plots the band map.
 
         Parameters
@@ -199,7 +346,7 @@ class band_map():
         Angl, Ekin = np.meshgrid(self.angles, self.ekin)
         mesh = ax.pcolormesh(Angl, Ekin, self.intensities, shading='auto',
                cmap=plt.get_cmap('bone').reversed())
-        cbar = plt.colorbar(mesh, ax=ax)
+        cbar = plt.colorbar(mesh, ax=ax, label="counts (-)")
 
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('$E_{\mathrm{kin}}$ (eV)')
@@ -247,6 +394,8 @@ class band_map():
         fig : Matplotlib-Figure
             Figure containing the Fermi edge fit
         """
+        from scipy.ndimage import gaussian_filter
+        
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
         min_angle_index = np.argmin(np.abs(self.angles - angle_min))
@@ -270,10 +419,11 @@ class band_map():
         parameters = np.array(
             [hnuminphi_guess, background_guess, integrated_weight_guess])
 
-        extra_args = (self.energy_resolution)
+        extra_args = (self.temperature)
 
-        popt, pcov = fit_leastsq(parameters, energy_range, integrated_intensity,
-                                 fdir_initial, extra_args)
+        popt, pcov = fit_leastsq(parameters, energy_range, \
+                     integrated_intensity, fdir_initial, \
+                     self.energy_resolution, extra_args)
 
         fdir_final = fermi_dirac(temperature=self.temperature,
                                  hnuminphi=popt[0], background=popt[1],
@@ -286,16 +436,20 @@ class band_map():
         ax.set_xlabel(r'$E_{\mathrm{kin}}$ (-)')
         ax.set_ylabel('Counts (-)')
         ax.set_xlim([ekin_min, ekin_max])
-
+  
         ax.plot(energy_range, integrated_intensity, label='Data')
 
-        ax.plot(energy_range, fdir_initial.convolve(energy_range,
-                energy_resolution=self.energy_resolution),
-                label=fdir_initial.name)
-
-        ax.plot(energy_range, fdir_final.convolve(energy_range,
-                energy_resolution=self.energy_resolution),
-                label=fdir_final.name)
+        extend, step, numb = extend_function(energy_range, \
+                                             self.energy_resolution)
+        
+        initial_result = gaussian_filter(fdir_initial.evaluate(extend), \
+                         sigma=step)[numb:-numb if numb else None]
+        
+        final_result = gaussian_filter(fdir_final.evaluate(extend), \
+                       sigma=step)[numb:-numb if numb else None]
+        
+        ax.plot(energy_range, initial_result, label=fdir_initial.name)
+        ax.plot(energy_range, final_result, label=fdir_final.name)
 
         ax.legend()
 
