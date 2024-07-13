@@ -141,8 +141,8 @@ class MDCs():
                                             kinetic_energy, self.hnuminphi)
             else:
                 extended_result = dist.evaluate(extend)
-            
-            if matrix_element is not None:
+                
+            if matrix_element is not None and hasattr(dist, 'index'):
                 extended_result *= matrix_element(extend, **matrix_args)
                 
             total_result += extended_result
@@ -212,9 +212,9 @@ class MDCs():
         ax.set_ylabel('Counts (-)')
         
         self.plot(ax=ax, show=False)
-     
+    
         for dist in new_distributions:
-            if matrix_element is not None:
+            if hasattr(dist, 'index') and matrix_element is not None:
                 if dist.class_name == 'spectral_quadratic':
                     dist.plot(self.angles, self.angle_resolution,
                     kinetic_energy=kinetic_energy, hnuminphi=self.hnuminphi, \
@@ -231,7 +231,7 @@ class MDCs():
                     ax=ax, show=False)
                 else:
                     dist.plot(self.angles, self.angle_resolution, \
-                    ax=ax, show=False)                        
+                        ax=ax, show=False)           
                 
         ax.plot(self.angles, self.intensities + outcome.residual, \
                 label='Distribution sum')

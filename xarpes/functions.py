@@ -72,24 +72,28 @@ def residual(parameters, xdata, ydata, angle_resolution, new_distributions,
     """
     from scipy.ndimage import gaussian_filter
     
+    if matrix_element is not None:
+        matrix_parameters = {}
+        for name in element_names:
+            if name in parameters:
+                matrix_parameters[name] = parameters[name].value       
+    
     new_distributions = build_distributions(new_distributions, parameters)
 
     extend, step, numb = extend_function(xdata, angle_resolution)
     
     model = np.zeros_like(extend)
+    
     for dist in new_distributions:
-        if dist.class_name == 'spectral_quadratic': 
-            model += dist.evaluate(extend, kinetic_energy,
-                                  hnuminphi)
+        if hasattr(dist, 'index') and matrix_element is not None:
+            if dist.class_name == 'spectral_quadratic': 
+                model += dist.evaluate(extend, kinetic_energy, hnuminphi) \
+                * matrix_element(extend, **matrix_parameters)
+            else:
+                model += dist.evaluate(extend) * matrix_element(extend, \
+                                                 **matrix_parameters)
         else:
             model += dist.evaluate(extend)
-                
-    if matrix_element is not None:
-        matrix_parameters = {}
-        for name in element_names:
-            if name in parameters:
-                matrix_parameters[name] = parameters[name].value
-        model *= matrix_element(extend, **matrix_parameters)
             
     model = gaussian_filter(model, sigma=step)[numb:-numb if numb else None]      
     return model - ydata

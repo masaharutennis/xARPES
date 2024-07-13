@@ -46,6 +46,11 @@ class create_distributions:
         """
         import copy
         return type(self)(copy.deepcopy(self.distributions, memo))
+    
+    def __getitem__(self, index):
+        r"""
+        """
+        return self.distributions[index]
         
     @add_fig_kwargs
     def plot(self, angle_range, angle_resolution, kinetic_energy=None, \
@@ -525,6 +530,7 @@ class non_unique_distribution(distribution):
     def __init__(self, name, index):
         super().__init__(name)
         self._label = name + '_' + index
+        self._index = index
 
     @property
     def label(self):
@@ -533,10 +539,23 @@ class non_unique_distribution(distribution):
         Returns
         -------
         label : str
-            Unique label for instances, identical to the name for unique
-            distributions. Not to be modified after instantiation.
+            Unique label for instances, consisting of the label and the index
+            for non-unique distributions. Not to be modified after 
+            instantiation.
         """
         return self._label
+ 
+    @property
+    def index(self):
+        r"""Returns the unique class index.
+
+        Returns
+        -------
+        index : str
+            Unique index for instances. Not to be modified after instantiation.
+        """
+        return self._index
+    
 
 class dispersion(non_unique_distribution):
     r"""Dispersions are assumed to be unique, so they need an index.
