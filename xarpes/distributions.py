@@ -8,11 +8,10 @@ from .plotting import get_ax_fig_plt, add_fig_kwargs
 
 # Physical constants
 k_B = 8.617e-5 # Boltzmann constant [eV/K]
-dtor = np.pi/180 # Degrees to radians [rad/deg]
+dtor = np.pi / 180 # Degrees to radians [rad/deg]
 pref = 3.80998211616 # hbar^2/(2m_e) [eV Angstrom^2]
 fwhm_to_std = np.sqrt(8 * np.log(2)) # Convert FWHM to std [-]
 sigma_extend = 5 # Extend data range by "5 sigma"
-
 
 class create_distributions:
     r"""
@@ -20,10 +19,10 @@ class create_distributions:
     def __init__(self, distributions):
         # Adds a call method to the distribution list
         self.distributions = distributions
-        
+
     def __call__(self):
         return self.distributions
-        
+
     @property
     def distributions(self):
         r"""
@@ -39,67 +38,67 @@ class create_distributions:
     def __iter__(self):
         r"""
         """
-        return iter(self.distributions)   
-    
+        return iter(self.distributions)
+
     def __deepcopy__(self, memo):
         r"""
         """
         import copy
         return type(self)(copy.deepcopy(self.distributions, memo))
-    
+
     def __getitem__(self, index):
         r"""
         """
         return self.distributions[index]
-        
+
     @add_fig_kwargs
     def plot(self, angle_range, angle_resolution, kinetic_energy=None, \
-             hnuminphi=None, matrix_element=None, matrix_args=None, ax=None, **kwargs):
+             hnuminphi=None, matrix_element=None, matrix_args=None, ax=None, \
+             **kwargs):
         r"""
         """
         if angle_resolution < 0:
             raise ValueError('Distributions cannot be plotted with negative '
                             + 'resolution.')
-        
-        from scipy.ndimage import gaussian_filter 
-        
+
+        from scipy.ndimage import gaussian_filter
+
         ax, fig, plt = get_ax_fig_plt(ax=ax)
-                
+
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('Counts (-)')
-                
+
         total_result = np.zeros(np.shape(extend))
-        
+
         for dist in self.distributions:
             if dist.class_name == 'spectral_quadratic':
                 if (dist.center_angle is not None) and (kinetic_energy is \
                     None or hnuminphi is None):
-                    raise ValueError('Spectral quadratic function is ' + 
+                    raise ValueError('Spectral quadratic function is ' +
                     'defined in terms of a center angle. Please provide ' +
                     'a kinetic energy and hnuminphi.')
                 extended_result = dist.evaluate(extend, \
                                             kinetic_energy, hnuminphi)
             else:
                 extended_result = dist.evaluate(extend)
-                
+
             if matrix_element is not None:
                 extended_result *= matrix_element(extend, **matrix_args)
-                
+
             total_result += extended_result
-            
+
             individual_result = gaussian_filter(extended_result, sigma=step \
                                                )[numb:-numb if numb else None]
             ax.plot(angle_range, individual_result, label=dist.label)
-        
+
         final_result = gaussian_filter(total_result, sigma=step \
                                                )[numb:-numb if numb else None]
-        
+
         ax.plot(angle_range, final_result, label=str('Distribution sum'))
 
         ax.legend()
-        
-        return fig
 
+        return fig
 
 class distribution:
     r"""Parent class for distributions. The class cannot be used on its own,
@@ -112,24 +111,24 @@ class distribution:
     """
     def __init__(self, name):
         self._name = name
-    
+
     @property
     def name(self):
         r"""
         """
         return self._name
-    
-    def extend_range(self, abscissa_range, abscissa_resolution): 
+
+    def extend_range(self, abscissa_range, abscissa_resolution):
         r"""
         """
         step_size = np.abs(abscissa_range[1] - abscissa_range[0])
         step = abscissa_resolution / (step_size * fwhm_to_std)
         numb = int(sigma_extend * step)
-        extend = np.linspace(abscissa_range[0]  - numb * step_size,
+        extend = np.linspace(abscissa_range[0] - numb * step_size,
                              abscissa_range[-1] + numb * step_size,
                              len(abscissa_range) + 2 * numb)
         return extend, step, numb
-    
+
     @property
     def class_name(self):
         r"""TBD
@@ -146,31 +145,30 @@ class distribution:
             raise ValueError('Distribution cannot be plotted with negative '
                             + 'resolution.')
         from scipy.ndimage import gaussian_filter
-        
+
         ax, fig, plt = get_ax_fig_plt(ax=ax)
-                
+
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('Counts (-)')
-        
+
         extend, step, numb = self.extend_range(angle_range, angle_resolution)
-        
+
         if self.class_name == 'spectral_quadratic':
             extended_result = self.evaluate(extend, kinetic_energy, hnuminphi)
         else:
             extended_result = self.evaluate(extend)
-        
+
         if matrix_element is not None:
-            extended_result *= matrix_element(extend, **matrix_args) 
-        
+            extended_result *= matrix_element(extend, **matrix_args)
+
         final_result = gaussian_filter(extended_result, sigma=step)\
         [numb:-numb if numb else None]
-        
+
         ax.plot(angle_range, final_result, label=self.label)
 
         ax.legend()
-        
+
         return fig
-    
 
 class unique_distribution(distribution):
     r"""Parent class for unique distributions, to be used one at a time, e.g.,
@@ -197,7 +195,6 @@ class unique_distribution(distribution):
             distributions. Not to be modified after instantiation.
         """
         return self._label
-
 
 class fermi_dirac(unique_distribution):
     r"""Child class for Fermi-Dirac (FD) distributions, used e.g., during Fermi
@@ -322,8 +319,7 @@ class fermi_dirac(unique_distribution):
                 Integrated weight on top of the background [counts]
             """
             self._integrated_weight = x
-            
-            
+
     def __call__(self, energy_range, hnuminphi, background, integrated_weight,
                  temperature):
         """Call method to directly evaluate a FD distribution without having to
@@ -348,10 +344,10 @@ class fermi_dirac(unique_distribution):
             1D array of the energy-convolved FD distribution [counts]
         """
         k_BT = temperature * k_B
-        
-        return (integrated_weight / (1 + np.exp((energy_range - hnuminphi) / k_BT))
-            + background)
-        
+
+        return (integrated_weight / (1 + np.exp((energy_range - hnuminphi) \
+               / k_BT)) + background)
+
     def evaluate(self, energy_range):
         r"""Evaluates the FD distribution for a given class instance.
         No energy convolution is performed with evaluate.
@@ -367,11 +363,11 @@ class fermi_dirac(unique_distribution):
             1D array of the evaluated FD distribution [counts]
         """
         k_BT = self.temperature * k_B
-        
-        return  (self.integrated_weight
+
+        return (self.integrated_weight
             / (1 + np.exp((energy_range - self.hnuminphi) / k_BT))
             + self.background)
-    
+
     @add_fig_kwargs
     def plot(self, energy_range, energy_resolution, ax=None, **kwargs):
         r"""TBD
@@ -380,26 +376,25 @@ class fermi_dirac(unique_distribution):
             raise ValueError('Distribution cannot be plotted with negative '
                             + 'resolution.')
         from scipy.ndimage import gaussian_filter
-        
+
         ax, fig, plt = get_ax_fig_plt(ax=ax)
-                
+
         ax.set_xlabel(r'$E_{\mathrm{kin}}$ (-)')
         ax.set_ylabel('Counts (-)')
-        
+
         extend, step, numb = self.extend_range(energy_range, energy_resolution)
-        
+
         extended_result = self.evaluate(extend)
-        
+
         final_result = gaussian_filter(extended_result, sigma=step)\
         [numb:-numb if numb else None]
-        
+
         ax.plot(energy_range, final_result, label=self.label)
 
         ax.legend()
-        
-        return fig   
 
-        
+        return fig
+
 class constant(unique_distribution):
     r"""Child class for constant distributions, used e.g., during MDC fitting.
     The constant class is unique, only one instance should be used per task.
@@ -434,17 +429,16 @@ class constant(unique_distribution):
             The value of the distribution for the abscissa equal to 0.
         """
         self._offset = x
-        
+
     def __call__(self, angle_range, angle_resolution, offset):
         r"""For a constant, convolution changes nothing.
         """
         return np.full(np.shape(angle_range), offset)
-    
+
     def evaluate(self, angle_range):
         r"""For a constant, convolution changes nothing.
         """
         return np.full(np.shape(angle_range), self.offset)
-
 
 class linear(unique_distribution):
     r"""Child cass for for linear distributions, used e.g., during MDC fitting.
@@ -461,7 +455,7 @@ class linear(unique_distribution):
         super().__init__(name)
         self.offset = offset
         self.slope = slope
-        
+
     @property
     def offset(self):
         r"""Returns the offset of the linear distribution.
@@ -510,13 +504,12 @@ class linear(unique_distribution):
         r"""For a constant, convolution changes nothing.
         """
         return offset + slope * angle_range
-    
+
     def evaluate(self, angle_range):
         r"""For a straight line, convolution changes nothing.
         """
         return self.offset + self.slope * angle_range
 
-        
 class non_unique_distribution(distribution):
     r"""Parent class for unique distributions, to be used one at a time, e.g.,
     during the background of an MDC fit or the Fermi-Dirac distribution.
@@ -540,11 +533,11 @@ class non_unique_distribution(distribution):
         -------
         label : str
             Unique label for instances, consisting of the label and the index
-            for non-unique distributions. Not to be modified after 
+            for non-unique distributions. Not to be modified after
             instantiation.
         """
         return self._label
- 
+
     @property
     def index(self):
         r"""Returns the unique class index.
@@ -555,7 +548,6 @@ class non_unique_distribution(distribution):
             Unique index for instances. Not to be modified after instantiation.
         """
         return self._index
-    
 
 class dispersion(non_unique_distribution):
     r"""Dispersions are assumed to be unique, so they need an index.
@@ -602,72 +594,70 @@ class dispersion(non_unique_distribution):
         """
         self._broadening = x
 
-
 class spectral_linear(dispersion):
     r"""Class for the linear dispersion spectral function"""
     def __init__(self, amplitude, peak, broadening, name, index):
         super().__init__(amplitude=amplitude, peak=peak,
                          broadening=broadening, name=name, index=index)
-                
+
     def __call__(self, angle_range, angle_resolution, amplitude, broadening,
                 peak):
         r"""
-        """                            
+        """
         result = amplitude / np.pi * broadening / ((np.sin(angle_range * dtor) -
-              np.sin(peak * dtor))**2 + broadening**2)
+              np.sin(peak * dtor)) ** 2 + broadening ** 2)
         return result
-    
+
     def evaluate(self, angle_range):
         r"""
         """
-        dtor = np.pi/180
-            
-        result = self.amplitude / np.pi * self.broadening / ((np.sin( \
-        angle_range * dtor) - np.sin(self.peak * dtor))**2 + self.broadening**2)
-        return result
-    
-    
+        dtor = np.pi / 180
+
+        return self.amplitude / np.pi * self.broadening / ((np.sin(\
+        angle_range * dtor) - np.sin(self.peak * dtor)) ** 2 + \
+        self.broadening ** 2)
+
 class spectral_quadratic(dispersion):
     r"""Class for the quadratic dispersion spectral function"""
     def __init__(self, amplitude, peak, broadening, side, name, index,
                  center_wavevector=None, center_angle=None):
-        self.check_center_coordinates(center_wavevector, center_angle)        
+        self.check_center_coordinates(center_wavevector, center_angle)
         super().__init__(amplitude=amplitude, peak=peak,
                          broadening=broadening, name=name, index=index)
         self.side = side
         self.center_wavevector = center_wavevector
         self.center_angle = center_angle
-        
+
     @property
     def center_angle(self):
         r"""TBD
         """
         return self._center_angle
-        
+
     @center_angle.setter
     def center_angle(self, x):
         r"""TBD
         """
         self._center_angle = x
-        
+
     @property
     def center_wavevector(self):
         r"""TBD
         """
         return self._center_wavevector
-    
+
     @center_wavevector.setter
     def center_wavevector(self, x):
         r"""TBD
         """
         self._center_wavevector = x
-        
+
     @property
     def side(self):
         r"""TBD
         """
         return self._side
-        
+
     @side.setter
     def side(self, x):
         r"""TBD
@@ -679,24 +669,24 @@ class spectral_quadratic(dispersion):
         """
         if (center_wavevector is None and center_angle is None) \
         or (center_wavevector is not None and center_angle is not None):
-            raise ValueError('Please specify exactly one of center_wavevector ' + 
-                             'and center_angle.')
+            raise ValueError('Please specify exactly one of ' +
+                             'center_wavevector and center_angle.')
 
     def check_binding_angle(self, binding_angle):
         r"""TBD
         """
         if np.isnan(binding_angle):
             raise ValueError('The provided wavevector cannot be reached ' +
-                             'with the available range of kinetic ' + 
+                             'with the available range of kinetic ' +
                              'energies. Please check again.')
-    
+
     def __call__(self, angle_range, amplitude, broadening,
                 peak, kinetic_energy, hnuminphi, center_wavevector=None,
                  center_angle=None):
         r"""TBD
         """
         self.check_center_coordinates(center_wavevector, center_angle)
-                            
+
         if center_wavevector is not None:
             binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy) \
                                       * center_wavevector) / dtor
@@ -704,15 +694,14 @@ class spectral_quadratic(dispersion):
         elif center_angle is not None:
             binding_angle = self.center_angle * np.sqrt(hnuminphi / \
                                                       kinetic_energy)
-        
-        result = amplitude / np.pi * broadening / (((
-            np.sin(angle_range * dtor) - np.sin(binding_angle * dtor))**2 -
-            np.sin(peak * dtor)**2)**2 + broadening**2)
-        return result
-        
+
+        return amplitude / np.pi * broadening / (((np.sin(angle_range * dtor) \
+             - np.sin(binding_angle * dtor)) ** 2 - np.sin(peak * dtor) ** 2) \
+             ** 2 + broadening ** 2)
+
     def evaluate(self, angle_range, kinetic_energy, hnuminphi):
         r"""TBD
-        """        
+        """
         if self.center_wavevector is not None:
             binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy) \
                                       * self.center_wavevector) / dtor
@@ -720,35 +709,35 @@ class spectral_quadratic(dispersion):
         elif self.center_angle is not None:
             binding_angle = self.center_angle * np.sqrt(hnuminphi / \
                                                       kinetic_energy)
-        
-        result = self.amplitude / np.pi * self.broadening / (((
-            np.sin(angle_range * dtor) - np.sin(binding_angle * dtor))**2 -
-            np.sin(self.peak * dtor)**2)**2 + self.broadening**2)
-        return result
-    
+
+        return self.amplitude / np.pi * self.broadening / (((np.sin(\
+            angle_range * dtor) - np.sin(binding_angle * dtor)) ** 2 - np.sin(\
+            self.peak * dtor) ** 2) ** 2 + self.broadening ** 2)
+
     @add_fig_kwargs
     def plot(self, angle_range, angle_resolution, kinetic_energy, hnuminphi, \
              matrix_element=None, matrix_args=None, ax=None, **kwargs):
         r"""Overwrites generic class plotting method.
         """
         from scipy.ndimage import gaussian_filter
-        
+
         ax, fig, plt = get_ax_fig_plt(ax=ax)
-                
+
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('Counts (-)')
-        
+
         extend, step, numb = self.extend_range(angle_range, angle_resolution)
-        
+
         extended_result = self.evaluate(extend, kinetic_energy, hnuminphi)
-        
+
         if matrix_element is not None:
-            extended_result *= matrix_element(extend, **matrix_args)   
-        
-        final_result = gaussian_filter(extended_result, sigma=step)[numb:-numb if numb else None]
-        
+            extended_result *= matrix_element(extend, **matrix_args)
+
+        final_result = gaussian_filter(extended_result, sigma=step)[\
+        numb:-numb if numb else None]
+
         ax.plot(angle_range, final_result, label=self.label)
 
         ax.legend()
-        
+
         return fig

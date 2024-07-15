@@ -27,7 +27,6 @@ def plot_settings(name='default'):
     mpl.rcParams.update({'font.size': 16})
     plt.rcParams['legend.frameon'] = False
 
-
 def get_ax_fig_plt(ax=None, **kwargs):
     r"""Helper function used in plot functions supporting an optional `Axes`
     argument.
@@ -67,8 +66,9 @@ def add_fig_kwargs(func):
     """Decorator that adds keyword arguments for functions returning matplotlib
     figures.
 
-    The function should return either a matplotlib figure or a tuple where the first element
-    is a matplotlib figure, or None to signal some sort of error/unexpected event.
+    The function should return either a matplotlib figure or a tuple, where the
+    first element is a matplotlib figure, or None to signal some sort of
+    error/unexpected event.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -84,8 +84,8 @@ def add_fig_kwargs(func):
 
         # Call the original function
         result = func(*args, **kwargs)
-        
-        # Determine if result is a figure or a tuple with the first element as figure
+
+        # Determine if result is a figure or tuple with first element as figure
         if isinstance(result, tuple):
             fig = result[0]
             rest = result[1:]
@@ -102,7 +102,8 @@ def add_fig_kwargs(func):
             fig.suptitle(title)
 
         if size_kwargs is not None:
-            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'), **size_kwargs)
+            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'), \
+                                **size_kwargs)
 
         if ax_grid is not None:
             for ax in fig.axes:
@@ -111,15 +112,18 @@ def add_fig_kwargs(func):
         if ax_annotate:
             tags = string.ascii_letters
             if len(fig.axes) > len(tags):
-                tags = (1 + len(string.ascii_letters) // len(fig.axes)) * string.ascii_letters
+                tags = (1 + len(string.ascii_letters) // len(fig.axes)) * \
+                string.ascii_letters
             for ax, tag in zip(fig.axes, tags):
-                ax.annotate(f'({tag})', xy=(0.05, 0.95), xycoords='axes fraction')
+                ax.annotate(f'({tag})', xy=(0.05, 0.95), \
+                            xycoords='axes fraction')
 
         if tight_layout:
             try:
                 fig.tight_layout()
             except Exception as exc:
-                print('Ignoring Exception raised by fig.tight_layout\n', str(exc))
+                print('Ignoring Exception raised by fig.tight_layout ' +
+                      '\n', str(exc))
 
         if savefig:
             fig.savefig(savefig)

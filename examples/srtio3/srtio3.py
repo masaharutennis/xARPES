@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 # SrTiO$_3$ example
-### In this example, we extract the self-energies and Eliashberg function from a 2DEL in the d_{xy} bands on the TiO$_2$-terminated surface of SrTiO$_3$.
-
+### In this example, we extract the self-energies and Eliashberg function from
+### a 2DEL in the d$_{xy}$ bands on the TiO$_2$-terminated surface of SrTiO$_3$.
 
 import xarpes
 import matplotlib.pyplot as plt
@@ -11,9 +11,9 @@ xarpes.plot_settings('default')
 
 script_dir = xarpes.set_script_dir()
 
-dfld = 'data_sets'  # Folder containing the data
+dfld = 'data_sets' # Folder containing the data
 flnm = 'STO_2_0010STO_2_' # Name of the file
-extn = '.ibw'  # Extension of the file
+extn = '.ibw' # Extension of the file
 
 # These three packages no longer have to be loaded once data is generated
 # inside the band map class. Although maybe later on numpy will be needed.
@@ -32,7 +32,7 @@ fmin, amin = data['wave']['wave_header']['sfB'][0:2]
 angl = np.linspace(amin, amin + (anum - 1) * astp, anum)
 ekin = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
 
-fig = plt.figure(figsize=(6, 5))
+fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
 bmap = xarpes.band_map(intensities=intn, angles=angl, ekin=ekin,
@@ -60,30 +60,37 @@ ax = fig.gca()
 
 fig = mdcs.plot(ax=ax)
 
-import importlib
-importlib.reload(xarpes)
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
 
 k_0 = 0.03
+theta_0 = 0.6
+dtor = np.pi / 180
 
 guess_dists = xarpes.create_distributions([
 xarpes.constant(offset=600),
-xarpes.spectral_linear(amplitude=3000, peak=2.4, broadening=0.0001, name='Faint_band', index='1'),
-xarpes.spectral_quadratic(amplitude=3800, peak=2.45, broadening=0.00024, center_wavevector=k_0,
-                          side='right', name='Inner_band', index='2'),
-xarpes.spectral_quadratic(amplitude=1800, peak=3.6, broadening=0.0004, center_wavevector=k_0,
-                          side='right', name='Outer_band', index='3')
+xarpes.spectral_linear(amplitude=3000, peak=2.4, broadening=0.0001,
+                       name='Faint_band', index='1'),
+
+xarpes.spectral_quadratic(amplitude=3800, peak=2.45, broadening=0.00024,
+            center_wavevector=k_0, side='right', name='Inner_band', index='2'),
+
+xarpes.spectral_quadratic(amplitude=1800, peak=3.6, broadening=0.0004,
+            center_wavevector=k_0, side='right', name='Outer_band', index='3')
 ])
 
-theta_0 = 0.6
-dtor = np.pi/180
-
-mat_el = lambda x: np.sin((x-theta_0)*dtor)**2
+mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
 
 mat_args = {
-# 'theta_0' : 0.6,
+#  'theta_0' : 0.6
 }
 
-fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args)
+fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
+                           ax=ax, matrix_args=mat_args)
 
-fig, new_dists, covariance_matrix, new_mat_args = mdcs.fit(distributions=guess_dists,
-                        matrix_element=mat_el, matrix_args=mat_args, show=True)
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+fig, new_dists, covariance_matrix, new_mat_args = mdcs.fit(
+    distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
+    ax=ax, show=True)
