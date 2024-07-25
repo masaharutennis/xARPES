@@ -90,7 +90,7 @@ fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, show=True)
 fig = plt.figure(figsize=(8, 6))
 ax = fig.gca()
 
-fig, new_distributions, covariance_matrix = mdcs.fit(\
+fig, new_distributions, covariance_matrix = mdcs.fit(
      distributions=guess_dists, ax=ax, show=True)
 
 change = xarpes.spectral_linear(amplitude=500, peak=7.5, broadening=0.01,

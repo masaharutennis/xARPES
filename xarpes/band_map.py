@@ -106,8 +106,8 @@ class MDCs():
         return fig
 
     @add_fig_kwargs
-    def visualize_guess(self, distributions, energy_value=None, \
-                        matrix_element=None, matrix_args=None, ax=None, \
+    def visualize_guess(self, distributions, energy_value=None,
+                        matrix_element=None, matrix_args=None, ax=None,
                         **kwargs):
         r"""
         """
@@ -125,18 +125,18 @@ class MDCs():
         # Modify this when mdcs is a larger collection
         kinetic_energy = self.ekin
 
-        extend, step, numb = extend_function(self.angles, \
+        extend, step, numb = extend_function(self.angles,
                                              self.angle_resolution)
         total_result = np.zeros(np.shape(extend))
 
         for dist in distributions:
             if dist.class_name == 'spectral_quadratic':
-                if (dist.center_angle is not None) and (kinetic_energy is \
+                if (dist.center_angle is not None) and (kinetic_energy is
                     None or hnuminphi is None):
                     raise ValueError('Spectral quadratic function is ' +
                     'defined in terms of a center angle. Please provide ' +
                     'a kinetic energy and hnuminphi.')
-                extended_result = dist.evaluate(extend, \
+                extended_result = dist.evaluate(extend,
                                             kinetic_energy, self.hnuminphi)
             else:
                 extended_result = dist.evaluate(extend)
@@ -146,12 +146,12 @@ class MDCs():
 
             total_result += extended_result
 
-            individual_result = gaussian_filter(extended_result, \
+            individual_result = gaussian_filter(extended_result,
                                     sigma=step)[numb:-numb if numb else None]
 
             ax.plot(self.angles, individual_result, label=dist.label)
 
-        final_result = gaussian_filter(total_result, \
+        final_result = gaussian_filter(total_result,
                                 sigma=step)[numb:-numb if numb else None]
 
         ax.plot(self.angles, final_result, label='Distribution sum')
@@ -164,7 +164,7 @@ class MDCs():
         return fig
 
     @add_fig_kwargs
-    def fit(self, distributions, energy_value=None, matrix_element=None, \
+    def fit(self, distributions, energy_value=None, matrix_element=None,
             matrix_args=None, ax=None, **kwargs):
         r"""
         """
@@ -189,20 +189,20 @@ class MDCs():
         new_distributions = copy.deepcopy(distributions)
 
         if matrix_element is not None:
-            parameters, element_names = construct_parameters(distributions, \
+            parameters, element_names = construct_parameters(distributions,
                                                              matrix_args)
-            new_distributions = build_distributions(new_distributions, \
+            new_distributions = build_distributions(new_distributions,
                                                     parameters)
             mini = Minimizer(residual, parameters, fcn_args=(self.angles,
-            self.intensities, self.angle_resolution, new_distributions, \
-                    kinetic_energy, self.hnuminphi, matrix_element, \
+            self.intensities, self.angle_resolution, new_distributions,
+                    kinetic_energy, self.hnuminphi, matrix_element,
                                                              element_names))
         else:
             parameters = construct_parameters(distributions)
-            new_distributions = build_distributions(new_distributions, \
+            new_distributions = build_distributions(new_distributions,
                                                     parameters)
             mini = Minimizer(residual, parameters, fcn_args=(self.angles,
-            self.intensities, self.angle_resolution, new_distributions, \
+            self.intensities, self.angle_resolution, new_distributions,
                                 kinetic_energy, self.hnuminphi))
 
         outcome = mini.minimize('least_squares')
@@ -216,19 +216,19 @@ class MDCs():
         # The following until the residual statement could probably be combined
         # into a single method, such that visualize_guess() and fit() can both
         # call it.
-        extend, step, numb = extend_function(self.angles, \
+        extend, step, numb = extend_function(self.angles,
                                              self.angle_resolution)
 
         total_result = np.zeros(np.shape(extend))
 
         for dist in new_distributions:
             if dist.class_name == 'spectral_quadratic':
-                if (dist.center_angle is not None) and (kinetic_energy is \
+                if (dist.center_angle is not None) and (kinetic_energy is
                     None or hnuminphi is None):
                     raise ValueError('Spectral quadratic function is ' +
                     'defined in terms of a center angle. Please provide ' +
                     'a kinetic energy and hnuminphi.')
-                extended_result = dist.evaluate(extend, \
+                extended_result = dist.evaluate(extend,
                                             kinetic_energy, self.hnuminphi)
             else:
                 extended_result = dist.evaluate(extend)
@@ -238,12 +238,12 @@ class MDCs():
 
             total_result += extended_result
 
-            individual_result = gaussian_filter(extended_result, \
+            individual_result = gaussian_filter(extended_result,
                                     sigma=step)[numb:-numb if numb else None]
 
             ax.plot(self.angles, individual_result, label=dist.label)
 
-        final_result = gaussian_filter(total_result, \
+        final_result = gaussian_filter(total_result,
                                 sigma=step)[numb:-numb if numb else None]
 
         ax.plot(self.angles, final_result, label='Distribution sum')
@@ -391,7 +391,7 @@ class band_map():
         """
         self.angles = self.angles + shift
 
-    def slicing(self, angle_min, angle_max, energy_value=None, \
+    def slicing(self, angle_min, angle_max, energy_value=None,
                 energy_range=None):
         r"""
         Parameters
@@ -437,7 +437,7 @@ class band_map():
         binding_range_out, self.hnuminphi
 
     @add_fig_kwargs
-    def plot(self, abscissa='momentum', ordinate='binding_energy', ax=None, \
+    def plot(self, abscissa='momentum', ordinate='binding_energy', ax=None,
              **kwargs):
         r"""Plots the band map.
 
@@ -463,24 +463,24 @@ class band_map():
         if abscissa == 'angle':
             ax.set_xlabel('Angle ($\degree$)')
             if ordinate == 'kinetic_energy':
-                mesh = ax.pcolormesh(Angl, Ekin, self.intensities, \
+                mesh = ax.pcolormesh(Angl, Ekin, self.intensities,
                        shading='auto', cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E_{\mathrm{kin}}$ (eV)')
             elif ordinate == 'binding_energy':
                 Ebin = Ekin - self.hnuminphi
-                mesh = ax.pcolormesh(Angl, Ebin, self.intensities, \
+                mesh = ax.pcolormesh(Angl, Ebin, self.intensities,
                        shading='auto', cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E_{\mathrm{bin}}$ (eV)')
         elif abscissa == 'momentum':
             Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
             ax.set_xlabel(r'$k_{//}$ ($\mathrm{\AA}^{\endash1}$)')
             if ordinate == 'kinetic_energy':
-                mesh = ax.pcolormesh(Mome, Ekin, self.intensities, \
+                mesh = ax.pcolormesh(Mome, Ekin, self.intensities,
                        shading='auto', cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E_{\mathrm{kin}}$ (eV)')
             elif ordinate == 'binding_energy':
                 Ebin = Ekin - self.hnuminphi
-                mesh = ax.pcolormesh(Mome, Ebin, self.intensities, \
+                mesh = ax.pcolormesh(Mome, Ebin, self.intensities,
                        shading='auto', cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E_{\mathrm{bin}}$ (eV)')
 
@@ -556,8 +556,8 @@ class band_map():
 
         extra_args = (self.temperature)
 
-        popt, pcov = fit_leastsq(parameters, energy_range, \
-                     integrated_intensity, fdir_initial, \
+        popt, pcov = fit_leastsq(parameters, energy_range,
+                     integrated_intensity, fdir_initial,
                      self.energy_resolution, extra_args)
 
         fdir_final = fermi_dirac(temperature=self.temperature,
@@ -575,13 +575,13 @@ class band_map():
 
         ax.plot(energy_range, integrated_intensity, label='Data')
 
-        extend, step, numb = extend_function(energy_range, \
+        extend, step, numb = extend_function(energy_range,
                                              self.energy_resolution)
 
-        initial_result = gaussian_filter(fdir_initial.evaluate(extend), \
+        initial_result = gaussian_filter(fdir_initial.evaluate(extend),
                          sigma=step)[numb:-numb if numb else None]
 
-        final_result = gaussian_filter(fdir_final.evaluate(extend), \
+        final_result = gaussian_filter(fdir_final.evaluate(extend),
                        sigma=step)[numb:-numb if numb else None]
 
         ax.plot(energy_range, initial_result, label=fdir_initial.name)

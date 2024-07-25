@@ -102,7 +102,7 @@ def add_fig_kwargs(func):
             fig.suptitle(title)
 
         if size_kwargs is not None:
-            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'), \
+            fig.set_size_inches(size_kwargs.pop('w'), size_kwargs.pop('h'),
                                 **size_kwargs)
 
         if ax_grid is not None:
@@ -115,7 +115,7 @@ def add_fig_kwargs(func):
                 tags = (1 + len(string.ascii_letters) // len(fig.axes)) * \
                 string.ascii_letters
             for ax, tag in zip(fig.axes, tags):
-                ax.annotate(f'({tag})', xy=(0.05, 0.95), \
+                ax.annotate(f'({tag})', xy=(0.05, 0.95),
                             xycoords='axes fraction')
 
         if tight_layout:

@@ -42,16 +42,16 @@ def construct_parameters(distribution_list, matrix_args=None):
             parameters.add(name='offset_' + dist.label, value=dist.offset)
             parameters.add(name='slope_' + dist.label, value=dist.slope)
         elif dist.class_name == 'spectral_linear':
-            parameters.add(name='amplitude_' + dist.label, \
+            parameters.add(name='amplitude_' + dist.label,
                            value=dist.amplitude, min=0)
             parameters.add(name='peak_' + dist.label, value=dist.peak)
-            parameters.add(name='broadening_' + dist.label, \
+            parameters.add(name='broadening_' + dist.label,
                            value=dist.broadening, min=0)
         elif dist.class_name == 'spectral_quadratic':
-            parameters.add(name='amplitude_' + dist.label, \
+            parameters.add(name='amplitude_' + dist.label,
                            value=dist.amplitude, min=0)
             parameters.add(name='peak_' + dist.label, value=dist.peak)
-            parameters.add(name='broadening_' + dist.label, \
+            parameters.add(name='broadening_' + dist.label,
                            value=dist.broadening, min=0)
 
     if matrix_args is not None:
@@ -64,7 +64,7 @@ def construct_parameters(distribution_list, matrix_args=None):
         return parameters
 
 def residual(parameters, xdata, ydata, angle_resolution, new_distributions,
-             kinetic_energy, hnuminphi, matrix_element=None, \
+             kinetic_energy, hnuminphi, matrix_element=None,
              element_names=None):
     r"""
     """
@@ -88,7 +88,7 @@ def residual(parameters, xdata, ydata, angle_resolution, new_distributions,
                 model += dist.evaluate(extend, kinetic_energy, hnuminphi) \
                 * matrix_element(extend, **matrix_parameters)
             else:
-                model += dist.evaluate(extend) * matrix_element(extend, \
+                model += dist.evaluate(extend) * matrix_element(extend,
                                                  **matrix_parameters)
         else:
             model += dist.evaluate(extend)
@@ -120,7 +120,7 @@ def error_function(p, xdata, ydata, function, resolution, extra_args):
     if resolution:
         from scipy.ndimage import gaussian_filter
         extend, step, numb = extend_function(xdata, resolution)
-        residual = gaussian_filter(function(extend, *p, *extra_args), \
+        residual = gaussian_filter(function(extend, *p, *extra_args),
                    sigma=step)[numb:-numb if numb else None] - ydata
     else:
         residual = function(xdata, *p, *extra_args) - ydata
@@ -163,7 +163,7 @@ def fit_leastsq(p0, xdata, ydata, function, resolution=None, *extra_args):
     from scipy.optimize import leastsq
 
     pfit, pcov, infodict, errmsg, success = leastsq(
-        error_function, p0, args=(xdata, ydata, function, resolution, \
+        error_function, p0, args=(xdata, ydata, function, resolution,
                             extra_args), full_output=1)
 
     if (len(ydata) > len(p0)) and pcov is not None:
@@ -238,7 +238,7 @@ def download_examples():
                 for filename in filenames:
                     if filename.endswith('.Rmd'):
                         full_path = os.path.join(dirpath, filename)
-                        jupytext.write(jupytext.read(full_path), \
+                        jupytext.write(jupytext.read(full_path),
                                        full_path.replace('.Rmd', '.ipynb'))
                         os.remove(full_path) # Deletes .Rmd file afterwards
                         print(f'Converted and deleted {full_path}')
@@ -248,7 +248,7 @@ def download_examples():
         print(f'Cleaned up temporary files in {main_folder_path}')
         return 0
     else:
-        print(f'Failed to download the repository. Status code: \
+        print(f'Failed to download the repository. Status code:
                 {response.status_code}')
         return 1
 

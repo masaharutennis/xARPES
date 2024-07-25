@@ -52,8 +52,8 @@ class create_distributions:
         return self.distributions[index]
 
     @add_fig_kwargs
-    def plot(self, angle_range, angle_resolution, kinetic_energy=None, \
-             hnuminphi=None, matrix_element=None, matrix_args=None, ax=None, \
+    def plot(self, angle_range, angle_resolution, kinetic_energy=None,
+             hnuminphi=None, matrix_element=None, matrix_args=None, ax=None,
              **kwargs):
         r"""
         """
@@ -72,12 +72,12 @@ class create_distributions:
 
         for dist in self.distributions:
             if dist.class_name == 'spectral_quadratic':
-                if (dist.center_angle is not None) and (kinetic_energy is \
+                if (dist.center_angle is not None) and (kinetic_energy is
                     None or hnuminphi is None):
                     raise ValueError('Spectral quadratic function is ' +
                     'defined in terms of a center angle. Please provide ' +
                     'a kinetic energy and hnuminphi.')
-                extended_result = dist.evaluate(extend, \
+                extended_result = dist.evaluate(extend,
                                             kinetic_energy, hnuminphi)
             else:
                 extended_result = dist.evaluate(extend)
@@ -87,11 +87,11 @@ class create_distributions:
 
             total_result += extended_result
 
-            individual_result = gaussian_filter(extended_result, sigma=step \
+            individual_result = gaussian_filter(extended_result, sigma=step
                                                )[numb:-numb if numb else None]
             ax.plot(angle_range, individual_result, label=dist.label)
 
-        final_result = gaussian_filter(total_result, sigma=step \
+        final_result = gaussian_filter(total_result, sigma=step
                                                )[numb:-numb if numb else None]
 
         ax.plot(angle_range, final_result, label=str('Distribution sum'))
@@ -136,8 +136,8 @@ class distribution:
         return self.__class__.__name__
 
     @add_fig_kwargs
-    def plot(self, angle_range, angle_resolution, kinetic_energy=None, \
-             hnuminphi=None, matrix_element=None, matrix_args=None, \
+    def plot(self, angle_range, angle_resolution, kinetic_energy=None,
+             hnuminphi=None, matrix_element=None, matrix_args=None,
              ax=None, **kwargs):
         r"""Overwritten for fermi_dirac distribution.
         """
@@ -345,7 +345,7 @@ class fermi_dirac(unique_distribution):
         """
         k_BT = temperature * k_B
 
-        return (integrated_weight / (1 + np.exp((energy_range - hnuminphi) \
+        return (integrated_weight / (1 + np.exp((energy_range - hnuminphi)
                / k_BT)) + background)
 
     def evaluate(self, energy_range):
@@ -613,8 +613,8 @@ class spectral_linear(dispersion):
         """
         dtor = np.pi / 180
 
-        return self.amplitude / np.pi * self.broadening / ((np.sin(\
-        angle_range * dtor) - np.sin(self.peak * dtor)) ** 2 + \
+        return self.amplitude / np.pi * self.broadening / ((np.sin(
+        angle_range * dtor) - np.sin(self.peak * dtor)) ** 2 +
         self.broadening ** 2)
 
 class spectral_quadratic(dispersion):
@@ -688,34 +688,34 @@ class spectral_quadratic(dispersion):
         self.check_center_coordinates(center_wavevector, center_angle)
 
         if center_wavevector is not None:
-            binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy) \
+            binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy)
                                       * center_wavevector) / dtor
             self.check_binding_angle(binding_angle)
         elif center_angle is not None:
-            binding_angle = self.center_angle * np.sqrt(hnuminphi / \
+            binding_angle = self.center_angle * np.sqrt(hnuminphi /
                                                       kinetic_energy)
 
-        return amplitude / np.pi * broadening / (((np.sin(angle_range * dtor) \
-             - np.sin(binding_angle * dtor)) ** 2 - np.sin(peak * dtor) ** 2) \
+        return amplitude / np.pi * broadening / (((np.sin(angle_range * dtor)
+             - np.sin(binding_angle * dtor)) ** 2 - np.sin(peak * dtor) ** 2)
              ** 2 + broadening ** 2)
 
     def evaluate(self, angle_range, kinetic_energy, hnuminphi):
         r"""TBD
         """
         if self.center_wavevector is not None:
-            binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy) \
+            binding_angle = np.arcsin(np.sqrt(pref / kinetic_energy)
                                       * self.center_wavevector) / dtor
             self.check_binding_angle(binding_angle)
         elif self.center_angle is not None:
-            binding_angle = self.center_angle * np.sqrt(hnuminphi / \
+            binding_angle = self.center_angle * np.sqrt(hnuminphi /
                                                       kinetic_energy)
 
-        return self.amplitude / np.pi * self.broadening / (((np.sin(\
-            angle_range * dtor) - np.sin(binding_angle * dtor)) ** 2 - np.sin(\
+        return self.amplitude / np.pi * self.broadening / (((np.sin(
+            angle_range * dtor) - np.sin(binding_angle * dtor)) ** 2 - np.sin(
             self.peak * dtor) ** 2) ** 2 + self.broadening ** 2)
 
     @add_fig_kwargs
-    def plot(self, angle_range, angle_resolution, kinetic_energy, hnuminphi, \
+    def plot(self, angle_range, angle_resolution, kinetic_energy, hnuminphi,
              matrix_element=None, matrix_args=None, ax=None, **kwargs):
         r"""Overwrites generic class plotting method.
         """
@@ -733,7 +733,7 @@ class spectral_quadratic(dispersion):
         if matrix_element is not None:
             extended_result *= matrix_element(extend, **matrix_args)
 
-        final_result = gaussian_filter(extended_result, sigma=step)[\
+        final_result = gaussian_filter(extended_result, sigma=step)[
         numb:-numb if numb else None]
 
         ax.plot(angle_range, final_result, label=self.label)
