@@ -32,9 +32,9 @@ xarpes.plot_settings('default')
 ```{python}
 script_dir = xarpes.set_script_dir()
 
-dfld = 'data_sets'  # Folder containing the data
+dfld = 'data_sets' # Folder containing the data
 flnm = 'graphene_raw_101' # Name of the file
-extn = '.ibw'  # Extension of the file
+extn = '.ibw' # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 ```
@@ -85,13 +85,13 @@ fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
-                              name="Linear test", index="1")
+                              name='Linear test', index='1')
 line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
-                              name="Linear test", index="2")
+                              name='Linear test', index='2')
 
-line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False, 
+line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
            fig_close=False)
-line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False, 
+line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
            fig_close=False)
 fig = mdcs.plot(ax=ax)
 ```
@@ -117,19 +117,15 @@ fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, show=True)
 fig = plt.figure(figsize=(8, 6))
 ax = fig.gca()
 
-fig, new_distributions, covariance_matrix = mdcs.fit(\
+fig, new_distributions, covariance_matrix = mdcs.fit(
      distributions=guess_dists, ax=ax, show=True)
 ```
 
 ```{python}
 change = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
-                               name="Linear_test", index="1")
+                               name='Linear_test', index='1')
 
 change.broadening = 0.02
 
 print(change.broadening)
-```
-
-```{python}
-
 ```

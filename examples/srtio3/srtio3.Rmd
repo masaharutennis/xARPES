@@ -31,9 +31,9 @@ xarpes.plot_settings('default')
 ```{python}
 script_dir = xarpes.set_script_dir()
 
-dfld = 'data_sets'  # Folder containing the data
+dfld = 'data_sets' # Folder containing the data
 flnm = 'STO_2_0010STO_2_' # Name of the file
-extn = '.ibw'  # Extension of the file
+extn = '.ibw' # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 ```
@@ -77,29 +77,27 @@ ax = fig.gca()
 
 k_0 = 0.03
 theta_0 = 0.6
-dtor = np.pi/180
+dtor = np.pi / 180
 
 guess_dists = xarpes.CreateDistributions([
 xarpes.Constant(offset=600),
 xarpes.SpectralLinear(amplitude=3000, peak=2.4, broadening=0.0001,
                       name='Faint_band', index='1'),
-    
 
 xarpes.SpectralQuadratic(amplitude=3800, peak=2.45, broadening=0.00024,
             center_wavevector=k_0, side='right', name='Inner_band', index='2'),
-    
-    
+
 xarpes.SpectralQuadratic(amplitude=1800, peak=3.6, broadening=0.0004,
             center_wavevector=k_0, side='right', name='Outer_band', index='3')
 ])
 
-mat_el = lambda x: np.sin((x-theta_0)*dtor)**2
+mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
 
 mat_args = {
 #  'theta_0' : 0.6
 }
 
-fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el, 
+fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
                            ax=ax, matrix_args=mat_args)
 ```
 
@@ -108,10 +106,6 @@ fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 fig, new_dists, covariance_matrix, new_mat_args = mdcs.fit(
-    distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args, 
+    distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
     ax=ax, show=True)
-```
-
-```{python}
-
 ```
