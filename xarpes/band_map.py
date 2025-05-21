@@ -574,37 +574,8 @@ class MDCs():
 
         return counts
 
-#     @add_fig_kwargs
-#     def plot(self, energy_value=None, ax=None, **kwargs):
-#         r"""
-#         TBD
-#         """
-#         if energy_value is not None:
-#             energy_index = np.abs(self.enel - energy_value).argmin()
-#             counts = self.intensities[energy_index, :]
-#             plot_multiple = False
-#         elif len(np.shape(self.intensities)) == 1:
-#             counts = self.intensities
-#             plot_multiple = False
-#         else:
-#             plot_multiple = True
-           
-#         if plot_multiple:
-#             pass
-#         else: 
-#             ax, fig, plt = get_ax_fig_plt(ax=ax)
 
-#             ax.scatter(self.angles, counts, label='Data')
-
-#             ax.set_xlabel('Angle ($\degree$)')
-#             ax.set_ylabel('Counts (-)')
-
-#             ax.legend()
-
-#             return fig
-
-
-    def plot(self, energy_value=None, ax=None, **kwargs):
+    def plot(self, energy_value=None, energy_range=None, ax=None, **kwargs):
         """
         Interactive or static plot with optional slider and full wrapper support.
         Behavior consistent with Jupyter and CLI based on show / fig_close.
@@ -623,50 +594,132 @@ class MDCs():
         ax_grid = kwargs.pop("ax_grid", None)
         ax_annotate = kwargs.pop("ax_annotate", False)
         size_kwargs = kwargs.pop("size_kwargs", None)
-        
+
+        if energy_value is not None and energy_range is not None:
+            raise ValueError(
+                "Provide either energy_value or energy_range, not both.")
+
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
-        if size_kwargs:
-            fig.set_size_inches(size_kwargs.pop("w"), size_kwargs.pop("h"), **size_kwargs)
+        angles = self.angles
+        energies = self.enel
+        intensities = self.intensities
+        existing_ymin, existing_ymax = ax.get_ylim()
 
-        fig.subplots_adjust(bottom=0.25)
+        if np.isscalar(energies):
+            if energy_value is not None or energy_range is not None:
+                raise ValueError(
+                    "This dataset contains only one energy slice; do not "
+                    "provide energy_value or energy_range."
+                )
+            ydata = intensities
+            ax.scatter(angles, ydata, label="Data")
+            ax.set_title(f"Energy slice: {energies:.3f} eV")
+            combined_ymin = min(existing_ymin, ydata.min())
+            combined_ymax = max(existing_ymax, ydata.max())
+            ax.set_ylim(combined_ymin, combined_ymax)
 
-        # Synthetic test data
-        x = np.linspace(-5, 5, 165)
-        shifts = np.linspace(-2, 2, 30)
-        y = np.array([np.exp(-(x - s)**2) * (1 + 0.1 * i)
-                      for i, s in enumerate(shifts)])
+        else:
+            if energy_value is not None:
+                if (energy_value < energies.min() or
+                        energy_value > energies.max()):
+                    raise ValueError(
+                        f"Requested energy_value {energy_value:.3f} eV is "
+                        f"outside the available energy range "
+                        f"[{energies.min():.3f}, {energies.max():.3f}] eV."
+                    )
+                idx = np.abs(energies - energy_value).argmin()
+                ydata = intensities[idx]
+                ax.scatter(angles, ydata, label="Data")
+                ax.set_title(f"Energy slice: {energies[idx]:.3f} eV")
+                combined_ymin = min(existing_ymin, ydata.min())
+                combined_ymax = max(existing_ymax, ydata.max())
+                ax.set_ylim(combined_ymin, combined_ymax)
 
-        # Initial plot
-        idx = 0
-        line, = ax.plot(x, y[idx], label=f"Slice {idx}")
+            elif energy_range is not None:
+                e_min, e_max = energy_range
+                mask = (energies >= e_min) & (energies <= e_max)
+                indices = np.where(mask)[0]
+                if len(indices) == 0:
+                    raise ValueError(
+                        "No energies found in the specified energy_range."
+                    )
+
+                ydata = intensities[indices]
+
+                fig.subplots_adjust(bottom=0.25)
+                idx = 0
+                scatter = ax.scatter(angles, ydata[idx], label="Data")
+                ax.set_title(
+                    f"Energy slice: {energies[indices[idx]]:.3f} eV"
+                )
+                combined_ymin = min(existing_ymin, ydata.min())
+                combined_ymax = max(existing_ymax, ydata.max())
+                ax.set_ylim(combined_ymin, combined_ymax)
+
+                slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
+                slider = Slider(
+                    slider_ax, "Energy index", 0, len(indices) - 1,
+                    valinit=idx, valstep=1
+                )
+
+                def update(val):
+                    i = int(slider.val)
+                    scatter.set_offsets(np.c_[angles, ydata[i]])
+                    ax.set_title(
+                        f"Energy slice: {energies[indices[i]]:.3f} eV"
+                    )
+                    fig.canvas.draw_idle()
+
+                slider.on_changed(update)
+                self._slider = slider
+                self._line = scatter
+
+            else:
+                e_min, e_max = energies[0], energies[-1]
+                mask = (energies >= e_min) & (energies <= e_max)
+                indices = np.where(mask)[0]
+                if len(indices) == 0:
+                    raise ValueError("No valid energy slices in the dataset.")
+
+                ydata = intensities[indices]
+
+                fig.subplots_adjust(bottom=0.25)
+                idx = 0
+                scatter = ax.scatter(angles, ydata[idx], label="Data")
+                ax.set_title(
+                    f"Energy slice: {energies[indices[idx]]:.3f} eV"
+                )
+                combined_ymin = min(existing_ymin, ydata.min())
+                combined_ymax = max(existing_ymax, ydata.max())
+                ax.set_ylim(combined_ymin, combined_ymax)
+
+                slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
+                slider = Slider(
+                    slider_ax, "Energy index", 0, len(indices) - 1,
+                    valinit=idx, valstep=1
+                )
+
+                def update(val):
+                    i = int(slider.val)
+                    scatter.set_offsets(np.c_[angles, ydata[i]])
+                    ax.set_title(
+                        f"Energy slice: {energies[indices[i]]:.3f} eV"
+                    )
+                    fig.canvas.draw_idle()
+
+                slider.on_changed(update)
+                self._slider = slider
+                self._line = scatter
+
         ax.set_xlabel("Angle (°)")
         ax.set_ylabel("Counts (-)")
-        ax.set_title(f"Fake slice {idx}")
-        ax.set_ylim(y.min(), y.max())
         ax.legend()
-
-        # Slider
-        slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
-        slider = Slider(slider_ax, "Index", 0, y.shape[0] - 1,
-                        valinit=idx, valstep=1)
-
-        def update(val):
-            i = int(slider.val)
-            line.set_ydata(y[i])
-            line.set_label(f"Slice {i}")
-            ax.set_title(f"Fake slice {i}")
-            ax.legend()
-            fig.canvas.draw_idle()
-
-        slider.on_changed(update)
-
-        # Retain references to prevent GC
-        self._slider = slider
         self._fig = fig
-        self._line = line
 
-        # Post-plot styling
+        if size_kwargs:
+            fig.set_size_inches(size_kwargs.pop("w"),
+                size_kwargs.pop("h"), **size_kwargs)
         if title:
             fig.suptitle(title)
         if tight_layout:
@@ -679,17 +732,17 @@ class MDCs():
         if ax_annotate:
             tags = string.ascii_lowercase
             for i, axis in enumerate(fig.axes):
-                axis.annotate(f"({tags[i]})", xy=(0.05, 0.95),
-                              xycoords="axes fraction")
+                axis.annotate(
+                    f"({tags[i]})", xy=(0.05, 0.95),
+                    xycoords="axes fraction"
+                )
 
-        # Match your visibility matrix
         is_interactive = hasattr(sys, 'ps1') or 'ipykernel' in sys.modules
         is_cli = not is_interactive
 
         if show:
             if is_cli:
                 plt.show()
-
         if fig_close:
             plt.close(fig)
 
@@ -697,7 +750,7 @@ class MDCs():
             return None
         return fig
 
-
+    
     @add_fig_kwargs
     def visualize_guess(self, distributions, energy_value=None,
                         matrix_element=None, matrix_args=None,

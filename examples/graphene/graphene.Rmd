@@ -86,72 +86,76 @@ print('The optimised hnu - Phi=' + f'{bmap.hnuminphi:.4f}' + ' +/- '
 ```
 
 ```{python}
-# angle_min = 0.1
-# angle_max = 1e6
-# en_val = 0
-# energy_range = [-0.3, 0.05]
+angle_min = 0.1
+angle_max = 1e6
+en_val = 0
+energy_range = [-0.3, 0.05]
 
-# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
 
-# fig = plt.figure(figsize=(5, 4))
-# ax = fig.gca()
+fig = plt.figure(figsize=(5, 4))
+ax = fig.gca()
 
-# fig = mdcs.plot(ax=ax, show=True)
+fig = mdcs.plot(ax=ax)
 
-# # change = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
-# #                                name='Linear_test', index='1')
+# change = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
+#                                name='Linear_test', index='1')
 
-# # change.broadening = 0.02
+# change.broadening = 0.02
 
-# # print(change.broadening)
+# print(change.broadening)
 ```
 
 ```{python}
-# angle_min = 0
-# angle_max = 1e6
-# en_val = 0
+angle_min = 0
+angle_max = 1e6
+en_val = 0
 
-# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
-# new_range = mdcs.angles
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
+new_range = mdcs.angles
 
-# fig = plt.figure(figsize=(7, 5))
-# ax = fig.gca()
+# %matplotlib widget
 
-# line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
-#                               name='Linear test', index='1')
-# line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
-#                               name='Linear test', index='2')
+line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
+                              name='Linear test', index='1')
+line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
+                              name='Linear test', index='2')
 
-# line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
-#            fig_close=False)
-# line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
-#            fig_close=False)
-# fig = mdcs.plot(ax=ax)
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+           fig_close=False)
+line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+           fig_close=False)
+fig = mdcs.plot(ax=ax)
 ```
 
 ```{python}
-# fig = plt.figure(figsize=(8, 6))
-# ax = fig.gca()
+# %matplotlib inline
 
-# guess_dists = xarpes.CreateDistributions([
-# xarpes.Linear(offset=3.0e3, slope=-100),
-# xarpes.SpectralLinear(amplitude=450, peak=7.4, broadening=0.012,
-#                       name='Linear_test', index='1'),
-# xarpes.SpectralLinear(amplitude=60, peak=4.2, broadening=0.018,
-#                       name='Linear_test', index='2'),
-# # xarpes.SpectralQuadratic(amplitude=20, peak=4.5, center_wavevector=0,
-# #    broadening=0.005, side='right', name='Quadratic_test', index='1')
-# ])
+fig = plt.figure(figsize=(8, 6))
+ax = fig.gca()
 
-# fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, show=True)
+guess_dists = xarpes.CreateDistributions([
+xarpes.Linear(offset=3.0e3, slope=-100),
+xarpes.SpectralLinear(amplitude=450, peak=7.4, broadening=0.012,
+                      name='Linear_test', index='1'),
+xarpes.SpectralLinear(amplitude=60, peak=4.2, broadening=0.018,
+                      name='Linear_test', index='2'),
+# xarpes.SpectralQuadratic(amplitude=20, peak=4.5, center_wavevector=0,
+#    broadening=0.005, side='right', name='Quadratic_test', index='1')
+])
+
+fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, show=True)
 ```
 
 ```{python}
-# fig = plt.figure(figsize=(8, 6))
-# ax = fig.gca()
+fig = plt.figure(figsize=(8, 6))
+ax = fig.gca()
 
-# fig, new_distributions, covariance_matrix = mdcs.fit(
-#      distributions=guess_dists, ax=ax, show=True)
+fig, new_distributions, covariance_matrix = mdcs.fit(
+     distributions=guess_dists, ax=ax, show=True)
 ```
 
 ```{python}
@@ -177,47 +181,43 @@ reload(xarpes)
 
 angle_min = 0.
 angle_max = 12
-en_val = 0.01
+en_val = 0.015
 energy_range = [-0.25, 0.01]
 
-mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
-fig = mdcs.plot(ax=ax, show=True, fig_close=False)
+energy_range = [-0.15, 0.1]
+
+fig = mdcs.plot(ax=ax, show=False, fig_close=False, energy_range=energy_range)
 ```
 
 ```{python}
-# # Implementation of matplotlib function
-# import matplotlib.pyplot as plt
-# import numpy as np
-# from matplotlib.colors import LogNorm
+angle_min = 0
+angle_max = 1e6
+en_val = 0
 
-# dx, dy = 0.015, 0.05
-# x = np.arange(-4.0, 4.0, dx)
-# y = np.arange(-4.0, 4.0, dy)
-# X, Y = np.meshgrid(x, y)
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+# new_range = mdcs.angles
 
-# extent = np.min(x), np.max(x), np.min(y), np.max(y)
+import xarpes
+reload(xarpes)
 
-# Z1 = np.add.outer(range(8), range(8)) % 2
-# plt.imshow(Z1, cmap="binary_r",
-#            interpolation='nearest',
-#            extent=extent,
-#            alpha=1)
+# %matplotlib widget
 
-# def geeks(x, y):
-#     return (1 - x / 2 + x**5 + y**6) * np.exp(-(x**2 + y**2))
+line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
+                              name='Linear test', index='1')
+line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
+                              name='Linear test', index='2')
 
-# Z2 = geeks(X, Y)
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
 
-# x = plt.imshow(Z2, cmap="Greens",
-#                alpha=0.7,
-#                interpolation='bilinear',
-#                extent=extent)
-# plt.title('matplotlib.pyplot.close Example')
-
-# plt.show()
-# plt.close()
+line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+           fig_close=False)
+line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+           fig_close=False)
+fig = mdcs.plot(ax=ax)
 ```
