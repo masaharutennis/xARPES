@@ -177,7 +177,6 @@ def fit_leastsq(p0, xdata, ydata, function, resolution=None,
         If the covariance could not be estimated, returns np.inf.
     """
     from scipy.optimize import leastsq
-    import numpy as np
 
     if yerr is None:
         yerr = np.ones_like(ydata)

@@ -600,101 +600,72 @@ class MDCs():
 
         if energy_value is not None and energy_range is not None:
             raise ValueError(
-                "Provide either energy_value or energy_range, not both.")
+                "Provide at most energy_value or energy_range, not both.")
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
         angles = self.angles
         energies = self.enel
-        intensities = self.intensities
         existing_ymin, existing_ymax = ax.get_ylim()
 
         if np.isscalar(energies):
             if energy_value is not None or energy_range is not None:
                 raise ValueError(
-                    "This dataset contains only one energy slice; do not "
-                    "provide energy_value or energy_range."
+                    "This dataset contains only one momentum-distribution "
+                    "curve; do not provide energy_value or energy_range."
                 )
-            ydata = intensities
-            ax.scatter(angles, ydata, label="Data")
+            intensities = self.intensities
+            ax.scatter(angles, intensities, label="Data")
             ax.set_title(f"Energy slice: {energies:.3f} eV")
-            combined_ymin = min(existing_ymin, ydata.min())
-            combined_ymax = max(existing_ymax, ydata.max())
+            combined_ymin = min(existing_ymin, intensities.min())
+            combined_ymax = max(existing_ymax, intensities.max())
             ax.set_ylim(combined_ymin, combined_ymax)
 
         else:
+            # Disallow conflicting specifications
+            if (energy_value is not None) and (energy_range is not None):
+                raise ValueError("Provide either energy_value or energy_range, not both.")
+
+            emin, emax = energies.min(), energies.max()
+
+            # ---- Single-slice path (no slider) ----
             if energy_value is not None:
-                if (energy_value < energies.min() or
-                        energy_value > energies.max()):
+                if energy_value < emin or energy_value > emax:
                     raise ValueError(
                         f"Requested energy_value {energy_value:.3f} eV is "
                         f"outside the available energy range "
-                        f"[{energies.min():.3f}, {energies.max():.3f}] eV."
+                        f"[{emin:.3f}, {emax:.3f}] eV."
                     )
-                idx = np.abs(energies - energy_value).argmin()
-                ydata = intensities[idx]
-                ax.scatter(angles, ydata, label="Data")
+                idx = int(np.abs(energies - energy_value).argmin())
+                intensities = self.intensities[idx]
+                ax.scatter(angles, intensities, label="Data")
                 ax.set_title(f"Energy slice: {energies[idx]:.3f} eV")
-                combined_ymin = min(existing_ymin, ydata.min())
-                combined_ymax = max(existing_ymax, ydata.max())
+                combined_ymin = min(existing_ymin, intensities.min())
+                combined_ymax = max(existing_ymax, intensities.max())
                 ax.set_ylim(combined_ymin, combined_ymax)
 
-            elif energy_range is not None:
-                e_min, e_max = energy_range
-                mask = (energies >= e_min) & (energies <= e_max)
-                indices = np.where(mask)[0]
-                if len(indices) == 0:
-                    raise ValueError(
-                        "No energies found in the specified energy_range."
-                    )
-
-                ydata = intensities[indices]
-
-                fig.subplots_adjust(bottom=0.25)
-                idx = 0
-                scatter = ax.scatter(angles, ydata[idx], label="Data")
-                ax.set_title(
-                    f"Energy slice: {energies[indices[idx]]:.3f} eV"
-                )
-                combined_ymin = min(existing_ymin, ydata.min())
-                combined_ymax = max(existing_ymax, ydata.max())
-                ax.set_ylim(combined_ymin, combined_ymax)
-
-                slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
-                slider = Slider(
-                    slider_ax, "Energy index", 0, len(indices) - 1,
-                    valinit=idx, valstep=1
-                )
-
-                def update(val):
-                    i = int(slider.val)
-                    scatter.set_offsets(np.c_[angles, ydata[i]])
-                    ax.set_title(
-                        f"Energy slice: {energies[indices[i]]:.3f} eV"
-                    )
-                    fig.canvas.draw_idle()
-
-                slider.on_changed(update)
-                self._slider = slider
-                self._line = scatter
-
+            # ---- Multi-slice path (slider) ----
             else:
-                e_min, e_max = energies[0], energies[-1]
-                mask = (energies >= e_min) & (energies <= e_max)
+                if energy_range is not None:
+                    e_min, e_max = energy_range
+                    mask = (energies >= e_min) & (energies <= e_max)
+                else:
+                    # No selection given: use all energies
+                    mask = np.ones_like(energies, dtype=bool)
+
                 indices = np.where(mask)[0]
                 if len(indices) == 0:
-                    raise ValueError("No valid energy slices in the dataset.")
+                    raise ValueError("No energies found in the specified selection.")
 
-                ydata = intensities[indices]
+                intensities = self.intensities[indices]
 
                 fig.subplots_adjust(bottom=0.25)
                 idx = 0
-                scatter = ax.scatter(angles, ydata[idx], label="Data")
-                ax.set_title(
-                    f"Energy slice: {energies[indices[idx]]:.3f} eV"
-                )
-                combined_ymin = min(existing_ymin, ydata.min())
-                combined_ymax = max(existing_ymax, ydata.max())
+                scatter = ax.scatter(angles, intensities[idx], label="Data")
+                ax.set_title(f"Energy slice: {energies[indices[idx]]:.3f} eV")
+
+                combined_ymin = min(existing_ymin, intensities.min())
+                combined_ymax = max(existing_ymax, intensities.max())
                 ax.set_ylim(combined_ymin, combined_ymax)
 
                 slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
@@ -705,10 +676,8 @@ class MDCs():
 
                 def update(val):
                     i = int(slider.val)
-                    scatter.set_offsets(np.c_[angles, ydata[i]])
-                    ax.set_title(
-                        f"Energy slice: {energies[indices[i]]:.3f} eV"
-                    )
+                    scatter.set_offsets(np.c_[angles, intensities[i]])
+                    ax.set_title(f"Energy slice: {energies[indices[i]]:.3f} eV")
                     fig.canvas.draw_idle()
 
                 slider.on_changed(update)
@@ -785,12 +754,312 @@ class MDCs():
         return fig
     
 
+    def fit_all(self, distributions, energy_value=None, energy_range=None,
+            matrix_element=None, matrix_args=None, ax=None, **kwargs):
+        r"""
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.widgets import Slider
+        from copy import deepcopy
+        import string
+        import sys
+        from lmfit import Minimizer
+        from .functions import construct_parameters, build_distributions, \
+            residual
+
+        # Wrapper kwargs
+        title = kwargs.pop("title", None)
+        savefig = kwargs.pop("savefig", None)
+        show = kwargs.pop("show", True)
+        fig_close = kwargs.pop("fig_close", False)
+        tight_layout = kwargs.pop("tight_layout", False)
+        ax_grid = kwargs.pop("ax_grid", None)
+        ax_annotate = kwargs.pop("ax_annotate", False)
+        size_kwargs = kwargs.pop("size_kwargs", None)
+
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        energies = self.enel
+        existing_ymin, existing_ymax = ax.get_ylim()
+        new_distributions = deepcopy(distributions)
+
+        if energy_value is not None and energy_range is not None:
+            raise ValueError(
+                "Provide at most energy_value or energy_range, not both.")
+
+        if np.isscalar(energies):
+            if energy_value is not None or energy_range is not None:
+                raise ValueError(
+                    "This dataset contains only one momentum-distribution "
+                    "curve; do not provide energy_value or energy_range."
+                )
+            kinergies = np.atleast_1d(self.ekin)
+            intensities = np.atleast_2d(self.intensities)
+
+        else:
+            if energy_value is not None:
+                if (energy_value < energies.min() or energy_value > energies.max()):
+                    raise ValueError( f"Requested energy_value {energy_value:.3f} eV is " 
+                                     f"outside the available energy range " 
+                                     f"[{energies.min():.3f}, {energies.max():.3f}] eV." )
+                idx = np.abs(energies - energy_value).argmin()
+                indices = np.atleast_1d(idx)
+                kinergies = self.ekin[indices]
+                intensities = self.intensities[indices, :]
+
+            elif energy_range is not None:
+                e_min, e_max = energy_range
+                indices = np.where((energies >= e_min) & (energies <= e_max))[0]
+                if len(indices) == 0:
+                    raise ValueError("No energies found in the specified energy_range.")
+                kinergies = self.ekin[indices]
+                intensities = self.intensities[indices, :]
+
+            else:
+                kinergies = self.ekin
+                intensities = self.intensities
+
+        # Final shape guard
+        kinergies = np.atleast_1d(kinergies)
+        intensities = np.atleast_2d(intensities)
+
+        all_final_results = []
+        all_residuals = []
+        all_individual_results = []   # list of (n_individuals, n_angles)
+        individual_labels = None      # set from first slice
+
+        for kinergy, intensity in zip(kinergies, intensities):
+            if matrix_element is not None:
+                parameters, element_names = construct_parameters(new_distributions, matrix_args)
+                new_distributions = build_distributions(new_distributions, parameters)
+                mini = Minimizer(
+                    residual, parameters,
+                    fcn_args=(self.angles, intensity, self.angle_resolution,
+                              new_distributions, kinergy, self.hnuminphi,
+                              matrix_element, element_names)
+                )
+            else:
+                parameters = construct_parameters(new_distributions)
+                new_distributions = build_distributions(new_distributions, parameters)
+                mini = Minimizer(
+                    residual, parameters,
+                    fcn_args=(self.angles, intensity, self.angle_resolution,
+                              new_distributions, kinergy, self.hnuminphi)
+                )
+
+            outcome = mini.minimize('least_squares')
+            pcov = outcome.covar
+
+            # Rebuild the *fitted* distributions from optimized params
+            fitted_distributions = build_distributions(new_distributions, outcome.params)
+
+            # If using a matrix element, extract slice-specific args from the fit
+            if matrix_element is not None:
+                new_matrix_args = {key: outcome.params[key].value for key in matrix_args}
+            else:
+                new_matrix_args = None
+
+            # ---- Compute individual curves (smoothed, cropped) and final sum (no plotting here)
+            # replicate the smoothing/cropping logic used in _merge_and_plot
+            from scipy.ndimage import gaussian_filter
+            extend, step, numb = extend_function(self.angles, self.angle_resolution)
+
+            total_result_ext = np.zeros_like(extend)
+            indiv_rows = []   # will become (n_individuals, n_angles)
+            labels_this = []
+
+            for dist in fitted_distributions:
+                # evaluate each component on the extended grid
+                if getattr(dist, 'class_name', None) == 'SpectralQuadratic':
+                    if (getattr(dist, 'center_angle', None) is not None) and (
+                        kinergy is None or self.hnuminphi is None
+                    ):
+                        raise ValueError(
+                            'Spectral quadratic function is defined in terms '
+                            'of a center angle. Please provide a kinetic energy '
+                            'and hnuminphi.'
+                        )
+                    extended_result = dist.evaluate(extend, kinergy, self.hnuminphi)
+                else:
+                    extended_result = dist.evaluate(extend)
+
+                if matrix_element is not None and hasattr(dist, 'index'):
+                    args = new_matrix_args or {}
+                    extended_result *= matrix_element(extend, **args)
+
+                total_result_ext += extended_result
+
+                # smoothed & cropped individual
+                individual_curve = gaussian_filter(extended_result, sigma=step)[
+                    numb:-numb if numb else None
+                ]
+                indiv_rows.append(np.asarray(individual_curve))
+                labels_this.append(getattr(dist, 'label', str(dist)))
+
+            # final (sum) curve, smoothed & cropped
+            final_result_i = gaussian_filter(total_result_ext, sigma=step)[
+                numb:-numb if numb else None
+            ]
+            final_result_i = np.asarray(final_result_i)
+
+            # Residual for this slice
+            residual_i = np.asarray(intensity) - final_result_i
+
+            # Store per-slice results
+            all_final_results.append(final_result_i)
+            all_residuals.append(residual_i)
+            all_individual_results.append(np.vstack(indiv_rows))  # (n_individuals, n_angles)
+
+            # Capture labels once (assume consistent n_individuals across slices)
+            if individual_labels is None:
+                individual_labels = labels_this
+
+        if np.isscalar(energies):
+            # One slice only: plot MDC, Fit, Residual, and Individuals
+            ydata = np.asarray(intensities).squeeze()              # (n_angles,)
+            yfit  = np.asarray(all_final_results[0]).squeeze()     # (n_angles,)
+            yres  = np.asarray(all_residuals[0]).squeeze()         # (n_angles,)
+            yind  = np.asarray(all_individual_results[0])          # (n_individuals, n_angles)
+
+            ax.scatter(self.angles, ydata, label="Data")
+            # plot individuals with their labels
+            for j, lab in enumerate(individual_labels or []):
+                ax.plot(self.angles, yind[j], label=str(lab))
+            ax.plot(self.angles, yfit, label="Fit")
+            ax.scatter(self.angles, yres, label="Residual")
+
+            ax.set_title(f"Energy slice: {energies:.3f} eV")
+            ymin_candidates = [ydata.min(), yres.min()]
+            ymax_candidates = [ydata.max(), yres.max()]
+            if yind.size:
+                ymin_candidates.append(yind.min())
+                ymax_candidates.append(yind.max())
+            ax.set_ylim(min(ymin_candidates), max(ymax_candidates))
+
+        else:
+            # Build the selected energy list to show in titles (no indices needed)
+            if energy_value is not None:
+                _idx = int(np.abs(energies - energy_value).argmin())
+                energies_sel = np.atleast_1d(energies[_idx])
+            elif energy_range is not None:
+                e_min, e_max = energy_range
+                energies_sel = energies[(energies >= e_min) & (energies <= e_max)]
+            else:
+                energies_sel = energies
+
+            # Number of slices must match between data, fits, residuals, and individuals
+            n_slices = len(all_final_results)
+            assert intensities.shape[0] == n_slices == len(all_residuals) == len(all_individual_results), (
+                f"Mismatch: data {intensities.shape[0]}, fits {len(all_final_results)}, "
+                f"residuals {len(all_residuals)}, individuals {len(all_individual_results)}."
+            )
+            n_individuals = all_individual_results[0].shape[0] if n_slices else 0
+
+            fig.subplots_adjust(bottom=0.25)
+            idx = 0
+
+            # Initial draw (MDC + Individuals + Fit + Residual) at slice 0
+            scatter = ax.scatter(self.angles, intensities[idx], label="Data")
+
+            individual_lines = []
+            if n_individuals:
+                for j in range(n_individuals):
+                    lab = individual_labels[j] if individual_labels and j < len(individual_labels) else f"Comp {j}"
+                    ln, = ax.plot(self.angles, all_individual_results[idx][j], label=str(lab))
+                    individual_lines.append(ln)
+
+            result_line, = ax.plot(self.angles, all_final_results[idx], label="Fit")
+            resid_scatter = ax.scatter(self.angles, all_residuals[idx], label="Residual")
+
+            # Title + limits
+            ax.set_title(f"Energy slice: {energies_sel[idx]:.3f} eV")
+            ymin_candidates = [intensities.min(), np.min(all_residuals)]
+            ymax_candidates = [intensities.max(), np.max(all_residuals)]
+            if n_individuals:
+                ymin_candidates.append(np.min(all_individual_results))
+                ymax_candidates.append(np.max(all_individual_results))
+            ax.set_ylim(min(ymin_candidates), max(ymax_candidates))
+
+            # Slider over slice index (0..n_slices-1)
+            slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
+            slider = Slider(
+                slider_ax, "Energy index", 0, n_slices - 1,
+                valinit=idx, valstep=1
+            )
+
+            def update(val):
+                i = int(slider.val)
+                # Update MDC points
+                scatter.set_offsets(np.c_[self.angles, intensities[i]])
+
+                # Update individuals
+                if n_individuals:
+                    Yi = all_individual_results[i]  # (n_individuals, n_angles)
+                    for j, ln in enumerate(individual_lines):
+                        ln.set_ydata(Yi[j])
+
+                # Update fit and residual
+                result_line.set_ydata(all_final_results[i])
+                resid_scatter.set_offsets(np.c_[self.angles, all_residuals[i]])
+
+                # Update title
+                ax.set_title(f"Energy slice: {energies_sel[i]:.3f} eV")
+
+                # Redraw
+                fig.canvas.draw_idle()
+
+            slider.on_changed(update)
+            self._slider = slider
+            self._line = scatter
+            self._individual_lines = individual_lines
+            self._result_line = result_line
+            self._resid_scatter = resid_scatter
+
+        ax.set_xlabel("Angle (°)")
+        ax.set_ylabel("Counts (-)")
+        ax.legend()
+        self._fig = fig
+
+        if size_kwargs:
+            fig.set_size_inches(size_kwargs.pop("w"),
+                size_kwargs.pop("h"), **size_kwargs)
+        if title:
+            fig.suptitle(title)
+        if tight_layout:
+            fig.tight_layout()
+        if savefig:
+            fig.savefig(savefig)
+        if ax_grid is not None:
+            for axis in fig.axes:
+                axis.grid(bool(ax_grid))
+        if ax_annotate:
+            tags = string.ascii_lowercase
+            for i, axis in enumerate(fig.axes):
+                axis.annotate(
+                    f"({tags[i]})", xy=(0.05, 0.95),
+                    xycoords="axes fraction"
+                )
+
+        is_interactive = hasattr(sys, 'ps1') or 'ipykernel' in sys.modules
+        is_cli = not is_interactive
+
+        if show:
+            if is_cli:
+                plt.show()
+        if fig_close:
+            plt.close(fig)
+
+        if not show and (fig_close or is_cli):
+            return None
+        return fig
+    
+
     @add_fig_kwargs
     def fit(self, distributions, energy_value=None, matrix_element=None,
             matrix_args=None, ax=None, **kwargs):
         r"""
         """
-        import copy
+        from copy import deepcopy
         from lmfit import Minimizer
         from .functions import construct_parameters, build_distributions, \
             residual
@@ -803,10 +1072,10 @@ class MDCs():
         ax.scatter(self.angles, counts, label='Data')
 
         kinetic_energy = self.ekin
-        new_distributions = copy.deepcopy(distributions)
+        new_distributions = deepcopy(distributions)
 
         if matrix_element is not None:
-            parameters, element_names = construct_parameters(distributions, \
+            parameters, element_names = construct_parameters(distributions,
                                                              matrix_args)
             new_distributions = build_distributions(new_distributions, \
                                                     parameters)
@@ -814,41 +1083,32 @@ class MDCs():
                 residual, parameters,
                 fcn_args=(self.angles, self.intensities, self.angle_resolution,
                           new_distributions, kinetic_energy, self.hnuminphi,
-                          matrix_element, element_names)
-            )
+                          matrix_element, element_names))
         else:
             parameters = construct_parameters(distributions)
-            new_distributions = build_distributions(new_distributions, \
+            new_distributions = build_distributions(new_distributions,
                                                     parameters)
-            mini = Minimizer(
-                residual, parameters,
+            mini = Minimizer(residual, parameters,
                 fcn_args=(self.angles, self.intensities, self.angle_resolution,
-                          new_distributions, kinetic_energy, self.hnuminphi)
-            )
+                          new_distributions, kinetic_energy, self.hnuminphi))
 
         outcome = mini.minimize('least_squares')
         pcov = outcome.covar
-
+        
         # If matrix params were fitted, pass the fitted values to plotting
         if matrix_element is not None:
-            new_matrix_args = {key: outcome.params[key].value for key in \
+            new_matrix_args = {key: outcome.params[key].value for key in
                                matrix_args}
         else:
             new_matrix_args = None
 
-        final_result = self._merge_and_plot(
-            ax=ax,
-            distributions=new_distributions,
-            kinetic_energy=kinetic_energy,
-            matrix_element=matrix_element,
-            matrix_args=new_matrix_args,
-            plot_individual=True,
-        )
-
+        final_result = self._merge_and_plot(ax=ax, 
+            distributions=new_distributions, kinetic_energy=kinetic_energy,
+            matrix_element=matrix_element, matrix_args=new_matrix_args,
+            plot_individual=True)
         residual_vals = counts - final_result
         ax.scatter(self.angles, residual_vals, label='Residual')
         ax.legend()
-
         if matrix_element is not None:
             return fig, new_distributions, pcov, new_matrix_args
         else:
@@ -896,7 +1156,7 @@ class MDCs():
 
             total_result += extended_result
 
-            if plot_individual:
+            if plot_individual and ax:
                 individual = gaussian_filter(extended_result, sigma=step)\
                     [numb:-numb if numb else None]
                 ax.plot(self.angles, individual, label=getattr(dist, \
@@ -905,6 +1165,7 @@ class MDCs():
         # Smoothed, cropped total curve aligned to self.angles
         final_result = gaussian_filter(total_result, sigma=step)[numb:-numb \
                                                             if numb else None]
-        ax.plot(self.angles, final_result, label='Distribution sum')
+        if ax:
+            ax.plot(self.angles, final_result, label='Distribution sum')
 
         return final_result

@@ -13,14 +13,20 @@ pref = 3.80998211616 # hbar^2 / (2 m_e) [eV Angstrom^2]
 fwhm_to_std = np.sqrt(8 * np.log(2)) # Convert FWHM to std [-]
 sigma_extend = 5 # Extend data range by "5 sigma"
 
+
 class CreateDistributions:
     r"""
+    Thin container for distributions with leaf-aware utilities.
+    If a distribution implements `components()` -> iterable of leaf
+    distributions, we use it to count/flatten; otherwise it's treated as a leaf.
     """
     def __init__(self, distributions):
         # Adds a call method to the distribution list
         self.distributions = distributions
 
     def __call__(self):
+        r"""
+        """
         return self.distributions
 
     @property
@@ -40,16 +46,57 @@ class CreateDistributions:
         """
         return iter(self.distributions)
 
+    def __getitem__(self, index):
+        r"""
+        """
+        return self.distributions[index]
+
+    def __setitem__(self, index, value):
+        r"""
+        """
+        self.distributions[index] = value
+
+    def __len__(self):
+        r"""
+        """
+        # Fast path: flat list length (may be different from n_individuals if composites exist)
+        return len(self.distributions)
+
     def __deepcopy__(self, memo):
         r"""
         """
         import copy
         return type(self)(copy.deepcopy(self.distributions, memo))
 
-    def __getitem__(self, index):
-        r"""
+    # -------- Leaf-aware helpers --------
+    def _iter_leaves(self):
         """
-        return self.distributions[index]
+        Yield leaf distributions. If an item has .components(), flatten it;
+        else treat the item itself as a leaf.
+        """
+        for d in self.distributions:
+            comps = getattr(d, "components", None)
+            if callable(comps):
+                for leaf in comps():
+                    yield leaf
+            else:
+                yield d
+
+    @property
+    def n_individuals(self) -> int:
+        """
+        Number of leaf components (i.e., individual curves to plot).
+        """
+        # If items define __len__ as num_leaves you can use that;
+        # but components() is the most explicit/robust.
+        return sum(1 for _ in self._iter_leaves())
+
+    def flatten(self):
+        """
+        Return a flat list of leaf distributions (useful for plotting/storage).
+        """
+        return list(self._iter_leaves())
+    
 
     @add_fig_kwargs
     def plot(self, angle_range, angle_resolution, kinetic_energy=None,

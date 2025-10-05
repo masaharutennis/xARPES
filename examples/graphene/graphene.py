@@ -16,11 +16,6 @@ import os
 
 xarpes.plot_settings('default')
 
-# Making an inoccuous change here
-
-# Another change here
-# Next change
-
 script_dir = xarpes.set_script_dir()
 
 dfld = 'data_sets'    # Folder containing the data
@@ -59,7 +54,7 @@ plt.show()
 print('The optimised hnu - Phi=' + f'{bmap.hnuminphi:.4f}' + ' +/- '
       + f'{1.96 * bmap.hnuminphi_std:.5f}' + ' eV.')
 
-# fig = bmap.plot(ordinate='kinetic_energy', abscissa='angle')
+fig = bmap.plot(ordinate='kinetic_energy', abscissa='angle')
 
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
@@ -134,6 +129,25 @@ ax = fig.gca()
 fig, new_distributions, covariance_matrix = mdcs.fit(
      distributions=guess_dists, ax=ax, show=True)
 
+angle_min = 0
+angle_max = 1e6
+
+energy_range = [-0.1, 0.01]
+
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+
+
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+energy_range = [-0.01, 0.01]
+
+energy_value = 0.01
+
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+
+fig = mdcs.fit_all(distributions=guess_dists, ax=ax)
+
 # change = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
 #                                name='Linear_test', index='1')
 
@@ -162,11 +176,9 @@ fig, new_distributions, covariance_matrix = mdcs.fit(
 angle_min = 0
 angle_max = 1e6
 
-energy_range = [-0.2, 0.01]
+energy_range = [-0.05, 0]
 
 mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
-
-# new_range = mdcs.angles
 
 
 line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
