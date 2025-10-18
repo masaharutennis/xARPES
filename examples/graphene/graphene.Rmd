@@ -148,7 +148,7 @@ xarpes.SpectralLinear(amplitude=450, peak=7.4, broadening=0.012,
 xarpes.SpectralLinear(amplitude=60, peak=4.2, broadening=0.018,
                       name='Linear_test', index='2'),
 # xarpes.SpectralQuadratic(amplitude=20, peak=4.5, center_wavevector=0,
-#    broadening=0.005, side='right', name='Quadratic_test', index='1')
+#    broadening=0.005, name='Quadratic_test', index='1')
 ])
 
 fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, show=True)
@@ -178,12 +178,20 @@ fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 energy_range = [-0.01, 0.01]
-
 energy_value = 0.01
 
 mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
-fig = mdcs.fit_all(distributions=guess_dists, ax=ax)
+fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
+```
+
+```{python}
+self_energy = xarpes.SelfEnergy(*mdcs.fit_parameters(select_label='Linear_test_2'))
+
+print(self_energy.enel_range)
+print(self_energy.label)
+print(self_energy.properties)
+
 ```
 
 ```{python}
@@ -216,28 +224,28 @@ fig = mdcs.fit_all(distributions=guess_dists, ax=ax)
 ```
 
 ```{python}
-angle_min = 0
-angle_max = 1e6
+# angle_min = 0
+# angle_max = 1e6
 
-energy_range = [-0.05, 0]
+# energy_range = [-0.05, 0]
 
-mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
-# %matplotlib widget
+# # %matplotlib widget
 
-line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
-                              name='Linear test', index='1')
-line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
-                              name='Linear test', index='2')
+# line1 = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
+#                               name='Linear test', index='1')
+# line2 = xarpes.SpectralLinear(amplitude=600, peak=5.5, broadening=0.02,
+#                               name='Linear test', index='2')
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
-           fig_close=False)
-line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
-           fig_close=False)
-fig = mdcs.plot(ax=ax)
+# line1.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+#            fig_close=False)
+# line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
+#            fig_close=False)
+# fig = mdcs.plot(ax=ax)
 ```
 
 ```{python}

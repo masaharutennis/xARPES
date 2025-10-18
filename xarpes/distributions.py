@@ -28,6 +28,17 @@ class CreateDistributions:
         r"""
         """
         return self.distributions
+    
+    def extend_range(self, abscissa_range, abscissa_resolution):
+        r"""
+        """
+        step_size = np.abs(abscissa_range[1] - abscissa_range[0])
+        step = abscissa_resolution / (step_size * fwhm_to_std)
+        numb = int(sigma_extend * step)
+        extend = np.linspace(abscissa_range[0] - numb * step_size,
+                             abscissa_range[-1] + numb * step_size,
+                             len(abscissa_range) + 2 * numb)
+        return extend, step, numb
 
     @property
     def distributions(self):
@@ -59,7 +70,8 @@ class CreateDistributions:
     def __len__(self):
         r"""
         """
-        # Fast path: flat list length (may be different from n_individuals if composites exist)
+        # Fast path: flat list length (may be different from n_individuals 
+        # if composites exist)
         return len(self.distributions)
 
     def __deepcopy__(self, memo):
@@ -114,6 +126,9 @@ class CreateDistributions:
 
         ax.set_xlabel('Angle ($\degree$)')
         ax.set_ylabel('Counts (-)')
+
+
+        extend, step, numb = self.extend_range(angle_range, angle_resolution)
 
         total_result = np.zeros(np.shape(extend))
 
@@ -650,7 +665,7 @@ class SpectralLinear(Dispersion):
         super().__init__(amplitude=amplitude, peak=peak,
                          broadening=broadening, name=name, index=index)
 
-    def __call__(self, angle_range, angle_resolution, amplitude, broadening,
+    def __call__(self, angle_range, amplitude, broadening,
                 peak):
         r"""
         """
@@ -668,12 +683,11 @@ class SpectralLinear(Dispersion):
     
 class SpectralQuadratic(Dispersion):
     r"""Class for the quadratic dispersion spectral function"""
-    def __init__(self, amplitude, peak, broadening, side, name, index,
+    def __init__(self, amplitude, peak, broadening, name, index,
                  center_wavevector=None, center_angle=None):
         self.check_center_coordinates(center_wavevector, center_angle)
         super().__init__(amplitude=amplitude, peak=peak,
                          broadening=broadening, name=name, index=index)
-        self.side = side
         self.center_wavevector = center_wavevector
         self.center_angle = center_angle
 
@@ -700,18 +714,6 @@ class SpectralQuadratic(Dispersion):
         r"""TBD
         """
         self._center_wavevector = x
-
-    @property
-    def side(self):
-        r"""TBD
-        """
-        return self._side
-
-    @side.setter
-    def side(self, x):
-        r"""TBD
-        """
-        self._side = x
 
     def check_center_coordinates(self, center_wavevector, center_angle):
         r"""TBD

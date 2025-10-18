@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# SrTiO$_3$ example
-### In this example, we extract the self-energies and Eliashberg function from
-### a 2DEL in the d$_{xy}$ bands on the TiO$_2$-terminated surface of SrTiO$_3$.
+# $\rm{SrTiO}_3$ example
+### In this example, we extract the self-energies and Eliashberg function from  
+### a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of $\rm{SrTiO}_3$.
 
 import matplotlib as mpl
 mpl.use('Qt5Agg')
@@ -59,21 +59,26 @@ dtor = np.pi / 180
 
 guess_dists = xarpes.CreateDistributions([
 xarpes.Constant(offset=600),
+
 xarpes.SpectralLinear(amplitude=3000, peak=2.4, broadening=0.0001,
                       name='Faint_band', index='1'),
 
 xarpes.SpectralQuadratic(amplitude=3800, peak=2.45, broadening=0.00024,
-            center_wavevector=k_0, side='right', name='Inner_band', index='2'),
+            center_wavevector=k_0, name='Inner_band', index='2'),
 
 xarpes.SpectralQuadratic(amplitude=1800, peak=3.6, broadening=0.0004,
-            center_wavevector=k_0, side='right', name='Outer_band', index='3')
+            center_wavevector=k_0, name='Outer_band', index='3')
 ])
 
 mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
 
+# mat_el = lambda x, theta_0: np.sin((x - theta_0) * dtor) ** 2
+
 mat_args = {
 #  'theta_0' : 0.6
 }
+
+
 
 fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
                            ax=ax, matrix_args=mat_args, show=True)

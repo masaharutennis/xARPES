@@ -112,7 +112,7 @@ class BandMap():
         self.hnuminphi = hnuminphi
         self.hnuminphi_std = hnuminphi_std
 
-    # Band map is still missing a whole lot of properties and setters
+    # Band map is still missing some properties and setters
 
     @property
     def ekin(self):
@@ -524,6 +524,9 @@ class MDCs():
         self.enel = enel
         self.hnuminphi = hnuminphi
         self.angle_resolution = angle_resolution
+
+        self._enel_range= None
+        self._individual_properties = None
         
     @property
     def enel(self):
@@ -560,6 +563,44 @@ class MDCs():
         r"""
         """
         self._intensities = x
+
+    @property
+    def enel_range(self):
+        if self._enel_range is None:
+            raise AttributeError(
+                "enel_range not yet set. Run `.fit_selection()` first."
+            )
+        return self._enel_range
+    
+    @property
+    def individual_labels(self):
+        if self._individual_labels is None:
+            raise AttributeError(
+                "individual_labels not yet set. Run `.fit_selection()` first."
+            )
+        return self._individual_labels
+    
+    @property
+    def individual_properties(self):
+        """
+        Returns the list of per-slice, per-distribution labels and parameters.
+
+        Returns
+        -------
+        list of list of dict
+            Each element corresponds to one kinetic-energy slice and contains
+            a list of dictionaries (one per distribution) with keys such as
+            'amplitude', 'peak', 'broadening', etc., depending on the
+            distribution type.
+        """
+        if not hasattr(self, "_individual_properties") or \
+        self._individual_properties is None:
+            raise AttributeError(
+                "individual_properties not yet set. Run `.fit_selection()` or" \
+                " the fitting routine first."
+            )
+        return self._individual_properties
+
 
     def energy_check(self, energy_value):
         r"""
@@ -754,7 +795,7 @@ class MDCs():
         return fig
     
 
-    def fit_all(self, distributions, energy_value=None, energy_range=None,
+    def fit_selection(self, distributions, energy_value=None, energy_range=None,
             matrix_element=None, matrix_args=None, ax=None, **kwargs):
         r"""
         """
@@ -780,7 +821,6 @@ class MDCs():
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
         energies = self.enel
-        existing_ymin, existing_ymax = ax.get_ylim()
         new_distributions = deepcopy(distributions)
 
         if energy_value is not None and energy_range is not None:
@@ -815,6 +855,7 @@ class MDCs():
                 kinergies = self.ekin[indices]
                 intensities = self.intensities[indices, :]
 
+            # The following results in the fitting of all the MDCs
             else:
                 kinergies = self.ekin
                 intensities = self.intensities
@@ -825,8 +866,17 @@ class MDCs():
 
         all_final_results = []
         all_residuals = []
-        all_individual_results = []   # list of (n_individuals, n_angles)
-        individual_labels = None      # set from first slice
+        all_individual_results = []    # List of (n_individuals, n_angles)
+        all_individual_properties = [] # List of per-slice [ [label, {params}], ... ]
+        individual_labels = None       # List of (n_individuals) labels
+
+        # map class_name -> parameter names to extract
+        param_spec = {
+            'Constant': ('offset',),
+            'Linear': ('offset', 'slope'),
+            'SpectralLinear': ('amplitude', 'peak', 'broadening'),
+            'SpectralQuadratic': ('amplitude', 'peak', 'broadening'),
+        }
 
         for kinergy, intensity in zip(kinergies, intensities):
             if matrix_element is not None:
@@ -860,13 +910,13 @@ class MDCs():
                 new_matrix_args = None
 
             # ---- Compute individual curves (smoothed, cropped) and final sum (no plotting here)
-            # replicate the smoothing/cropping logic used in _merge_and_plot
             from scipy.ndimage import gaussian_filter
             extend, step, numb = extend_function(self.angles, self.angle_resolution)
 
             total_result_ext = np.zeros_like(extend)
-            indiv_rows = []   # will become (n_individuals, n_angles)
-            labels_this = []
+            indiv_rows = []   # (n_individuals, n_angles)
+            indiv_params = [] # list of [label, {params}] per distribution
+            individual_labels = []
 
             for dist in fitted_distributions:
                 # evaluate each component on the extended grid
@@ -894,7 +944,24 @@ class MDCs():
                     numb:-numb if numb else None
                 ]
                 indiv_rows.append(np.asarray(individual_curve))
-                labels_this.append(getattr(dist, 'label', str(dist)))
+
+                # label
+                label = getattr(dist, 'label', str(dist))
+                individual_labels.append(label)
+
+                # ---- collect parameters for this distribution
+                cls = getattr(dist, 'class_name', None)
+                wanted = param_spec.get(cls, ())
+                pvals = {}
+                for pname in wanted:
+                    if pname in outcome.params:
+                        pvals[pname] = outcome.params[pname].value
+                    else:
+                        pvals[pname] = getattr(dist, pname, None)
+                pvals['_class'] = cls
+
+                # combine label + parameter dict in same element
+                indiv_params.append([label, pvals])
 
             # final (sum) curve, smoothed & cropped
             final_result_i = gaussian_filter(total_result_ext, sigma=step)[
@@ -908,18 +975,20 @@ class MDCs():
             # Store per-slice results
             all_final_results.append(final_result_i)
             all_residuals.append(residual_i)
-            all_individual_results.append(np.vstack(indiv_rows))  # (n_individuals, n_angles)
+            all_individual_results.append(np.vstack(indiv_rows))
+            all_individual_properties.append(indiv_params)
 
-            # Capture labels once (assume consistent n_individuals across slices)
-            if individual_labels is None:
-                individual_labels = labels_this
+        # Set the enel_range variable
+        self._enel_range = kinergies - self.hnuminphi
+        self._individual_properties = all_individual_properties
+
 
         if np.isscalar(energies):
             # One slice only: plot MDC, Fit, Residual, and Individuals
-            ydata = np.asarray(intensities).squeeze()              # (n_angles,)
-            yfit  = np.asarray(all_final_results[0]).squeeze()     # (n_angles,)
-            yres  = np.asarray(all_residuals[0]).squeeze()         # (n_angles,)
-            yind  = np.asarray(all_individual_results[0])          # (n_individuals, n_angles)
+            ydata = np.asarray(intensities).squeeze()
+            yfit  = np.asarray(all_final_results[0]).squeeze()
+            yres  = np.asarray(all_residuals[0]).squeeze()
+            yind  = np.asarray(all_individual_results[0])
 
             ax.scatter(self.angles, ydata, label="Data")
             # plot individuals with their labels
@@ -937,7 +1006,8 @@ class MDCs():
             ax.set_ylim(min(ymin_candidates), max(ymax_candidates))
 
         else:
-            # Build the selected energy list to show in titles (no indices needed)
+            # Build the selected energy list to show in titles 
+            # (no indices needed)
             if energy_value is not None:
                 _idx = int(np.abs(energies - energy_value).argmin())
                 energies_sel = np.atleast_1d(energies[_idx])
@@ -947,7 +1017,8 @@ class MDCs():
             else:
                 energies_sel = energies
 
-            # Number of slices must match between data, fits, residuals, and individuals
+            # Number of slices must match between data, fits, residuals, 
+            # and individuals
             n_slices = len(all_final_results)
             assert intensities.shape[0] == n_slices == len(all_residuals) == len(all_individual_results), (
                 f"Mismatch: data {intensities.shape[0]}, fits {len(all_final_results)}, "
@@ -994,7 +1065,7 @@ class MDCs():
 
                 # Update individuals
                 if n_individuals:
-                    Yi = all_individual_results[i]  # (n_individuals, n_angles)
+                    Yi = all_individual_results[i] # (n_individuals, n_angles)
                     for j, ln in enumerate(individual_lines):
                         ln.set_ydata(Yi[j])
 
@@ -1169,3 +1240,99 @@ class MDCs():
             ax.plot(self.angles, final_result, label='Distribution sum')
 
         return final_result
+    
+
+    def fit_parameters(self, select_label):
+        r"""
+        Selects and returns the energy range together with the label
+        and its corresponding parameter subsets from
+        `self._individual_properties`.
+
+        Parameters
+        ----------
+        select_label : str
+            Label to look for among the fitted distributions.
+
+        Returns
+        -------
+        tuple
+            (self._enel_range, selected_label, selected_properties)
+
+        Raises
+        ------
+        AttributeError
+            If `_enel_range` or `_individual_properties` have not yet been set.
+        ValueError
+            If the given label is not found in any of the fitted distributions.
+        """
+        if self._enel_range is None:
+            raise AttributeError(
+                "enel_range not yet set. Run `.fit_selection()` first."
+            )
+
+        if not hasattr(self, "_individual_properties") or self._individual_properties is None:
+            raise AttributeError(
+                "individual_properties not yet set. Run `.fit_selection()` first."
+            )
+
+        # Collect all parameter dicts for the requested label
+        selected_properties = []
+        for slice_props in self._individual_properties:
+            for label, params in slice_props:
+                if label == select_label:
+                    selected_properties.append(params)
+                    break  # move to next slice once found
+
+        if not selected_properties:
+            # gather all labels for error reporting
+            all_labels = [lbl for sl in self._individual_properties for lbl, _ in sl]
+            raise ValueError(
+                f"Label '{select_label}' not found in available labels: {sorted(set(all_labels))}"
+            )
+
+        return self._enel_range, select_label, selected_properties
+
+
+class SelfEnergy():
+    r"""Class for the self-energy.
+    """
+    def __init__(self, enel_range, label, properties):
+        self.enel_range = enel_range
+        self.label = label
+        self.properties = properties
+
+    @property
+    def enel_range(self):
+        r"""
+        """
+        return self._enel_range
+    
+    @enel_range.setter
+    def enel_range(self, x):
+        r"""
+        """
+        self._enel_range = x
+
+    @property
+    def label(self):
+        r"""
+        """
+        return self._label
+    
+    @label.setter
+    def label(self, x):
+        r"""
+        """
+        self._label = x
+
+    @property
+    def properties(self):
+        r"""
+        """
+        return self._properties
+    
+    @properties.setter
+    def properties(self, x):
+        r"""
+        """
+        self._properties = x
