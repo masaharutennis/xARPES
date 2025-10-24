@@ -12,17 +12,11 @@
 """File containing all the spectral quantities."""
 
 import numpy as np
-from igor2 import packed, binarywave
+from igor2 import binarywave
 from .plotting import get_ax_fig_plt, add_fig_kwargs
 from .functions import fit_leastsq, extend_function
 from .distributions import FermiDirac, Linear
-
-# Physical constants
-# The first one can be generated with scipy.stats.norm.ppf(0.975)
-uncr = 1.95996398 # Standard deviation to 95 % confidence [-]
-dtor = np.pi / 180 # Degrees to radians [rad/deg]
-pref = 3.80998211616 # hbar^2/(2m_e) [eV Angstrom^2]
-kilo = 1e3 # 1000 [-]
+from .constants import uncr, pref, dtor, kilo, plot_margin
 
 class BandMap():
     r"""Class for the band map from the ARPES experiment.
@@ -676,12 +670,13 @@ class MDCs():
             intensities = self.intensities
             ax.scatter(angles, intensities, label="Data")
             ax.set_title(f"Energy slice: {energies * kilo:.3f} meV")
-            combined_ymin = min(existing_ymin, intensities.min())
-            combined_ymax = max(existing_ymax, intensities.max())
+
+            # y-lims use plot_margin * data-extrema, combined with existing limits
+            combined_ymin = min(existing_ymin, plot_margin * float(intensities.min()))
+            combined_ymax = max(existing_ymax, plot_margin * float(intensities.max()))
             ax.set_ylim(combined_ymin, combined_ymax)
 
         else:
-            # Disallow conflicting specifications
             if (energy_value is not None) and (energy_range is not None):
                 raise ValueError("Provide either energy_value or energy_range, not both.")
 
@@ -699,8 +694,9 @@ class MDCs():
                 intensities = self.intensities[idx]
                 ax.scatter(angles, intensities, label="Data")
                 ax.set_title(f"Energy slice: {energies[idx] * kilo:.3f} meV")
-                combined_ymin = min(existing_ymin, intensities.min())
-                combined_ymax = max(existing_ymax, intensities.max())
+
+                combined_ymin = min(existing_ymin, plot_margin * float(intensities.min()))
+                combined_ymax = max(existing_ymax, plot_margin * float(intensities.max()))
                 ax.set_ylim(combined_ymin, combined_ymax)
 
             # ---- Multi-slice path (slider) ----
@@ -709,7 +705,6 @@ class MDCs():
                     e_min, e_max = energy_range
                     mask = (energies >= e_min) & (energies <= e_max)
                 else:
-                    # No selection given: use all energies
                     mask = np.ones_like(energies, dtype=bool)
 
                 indices = np.where(mask)[0]
@@ -723,14 +718,17 @@ class MDCs():
                 scatter = ax.scatter(angles, intensities[idx], label="Data")
                 ax.set_title(f"Energy slice: {energies[indices[idx]] * kilo:.3f} meV")
 
-                combined_ymin = min(existing_ymin, intensities.min())
-                combined_ymax = max(existing_ymax, intensities.max())
+                # Initial y-lims from the currently shown slice ONLY
+                y0 = intensities[idx]
+                combined_ymin = min(existing_ymin, plot_margin * float(y0.min()))
+                combined_ymax = max(existing_ymax, plot_margin * float(y0.max()))
                 ax.set_ylim(combined_ymin, combined_ymax)
 
-                # Suppress warning when a single MDC is plotted
-                warnings.filterwarnings("ignore",
-                message="Attempting to set identical left == right",
-                category=UserWarning
+                # Suppress single-point slider warning (when len(indices) == 1)
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Attempting to set identical left == right",
+                    category=UserWarning
                 )
 
                 slider_ax = fig.add_axes([0.2, 0.08, 0.6, 0.04])
@@ -741,7 +739,17 @@ class MDCs():
 
                 def update(val):
                     i = int(slider.val)
-                    scatter.set_offsets(np.c_[angles, intensities[i]])
+                    yi = intensities[i]
+
+                    # Update data points
+                    scatter.set_offsets(np.c_[angles, yi])
+
+                    # Adaptive y-lims to the shown slice (with plot_margin)
+                    ymin = min(existing_ymin, plot_margin * float(yi.min()))
+                    ymax = max(existing_ymax, plot_margin * float(yi.max()))
+                    ax.set_ylim(ymin, ymax)
+
+                    # Update title and redraw
                     ax.set_title(f"Energy slice: {energies[indices[i]] * kilo:.3f} meV")
                     fig.canvas.draw_idle()
 
@@ -769,10 +777,8 @@ class MDCs():
         if ax_annotate:
             tags = string.ascii_lowercase
             for i, axis in enumerate(fig.axes):
-                axis.annotate(
-                    f"({tags[i]})", xy=(0.05, 0.95),
-                    xycoords="axes fraction"
-                )
+                axis.annotate(f"({tags[i]})", xy=(0.05, 0.95),
+                    xycoords="axes fraction")
 
         is_interactive = hasattr(sys, 'ps1') or 'ipykernel' in sys.modules
         is_cli = not is_interactive
@@ -879,8 +885,7 @@ class MDCs():
                 kinergies = self.ekin[indices]
                 intensities = self.intensities[indices, :]
 
-            # The following results in the fitting of all the MDCs
-            else:
+            else: # Without specifying a range, all MDCs are plotted
                 kinergies = self.ekin
                 intensities = self.intensities
 
@@ -1006,7 +1011,6 @@ class MDCs():
         self._enel_range = kinergies - self.hnuminphi
         self._individual_properties = all_individual_properties
 
-
         if np.isscalar(energies):
             # One slice only: plot MDC, Fit, Residual, and Individuals
             ydata = np.asarray(intensities).squeeze()
@@ -1022,12 +1026,16 @@ class MDCs():
             ax.scatter(self.angles, yres, label="Residual")
 
             ax.set_title(f"Energy slice: {energies * kilo:.3f} meV")
+
+            # y-lims from currently shown slice, scaled by plot_margin
             ymin_candidates = [ydata.min(), yres.min()]
             ymax_candidates = [ydata.max(), yres.max()]
             if yind.size:
                 ymin_candidates.append(yind.min())
                 ymax_candidates.append(yind.max())
-            ax.set_ylim(min(ymin_candidates), max(ymax_candidates))
+            ymin = plot_margin * float(min(ymin_candidates))
+            ymax = plot_margin * float(max(ymax_candidates))
+            ax.set_ylim(ymin, ymax)
 
         else:
             if energy_value is not None:
@@ -1063,19 +1071,22 @@ class MDCs():
             result_line, = ax.plot(self.angles, all_final_results[idx], label="Fit")
             resid_scatter = ax.scatter(self.angles, all_residuals[idx], label="Residual")
 
-            # Title + limits
+            # Title + limits (use only the currently shown slice, scaled by plot_margin)
             ax.set_title(f"Energy slice: {energies_sel[idx] * kilo:.3f} meV")
-            ymin_candidates = [intensities.min(), np.min(all_residuals)]
-            ymax_candidates = [intensities.max(), np.max(all_residuals)]
+            ymin_candidates = [intensities[idx].min(), all_residuals[idx].min()]
+            ymax_candidates = [intensities[idx].max(), all_residuals[idx].max()]
             if n_individuals:
-                ymin_candidates.append(np.min(all_individual_results))
-                ymax_candidates.append(np.max(all_individual_results))
-            ax.set_ylim(min(ymin_candidates), max(ymax_candidates))
+                ymin_candidates.append(all_individual_results[idx].min())
+                ymax_candidates.append(all_individual_results[idx].max())
+            ymin = plot_margin * float(min(ymin_candidates))
+            ymax = plot_margin * float(max(ymax_candidates))
+            ax.set_ylim(ymin, ymax)
 
             # Suppress warning when a single MDC is plotted
-            warnings.filterwarnings("ignore",
-            message="Attempting to set identical left == right",
-            category=UserWarning
+            warnings.filterwarnings(
+                "ignore",
+                message="Attempting to set identical left == right",
+                category=UserWarning
             )
 
             # Slider over slice index (0..n_slices-1)
@@ -1092,7 +1103,7 @@ class MDCs():
 
                 # Update individuals
                 if n_individuals:
-                    Yi = all_individual_results[i] # (n_individuals, n_angles)
+                    Yi = all_individual_results[i]  # (n_individuals, n_angles)
                     for j, ln in enumerate(individual_lines):
                         ln.set_ydata(Yi[j])
 
@@ -1100,10 +1111,18 @@ class MDCs():
                 result_line.set_ydata(all_final_results[i])
                 resid_scatter.set_offsets(np.c_[self.angles, all_residuals[i]])
 
-                # Update title
-                ax.set_title(f"Energy slice: {energies_sel[i] * kilo:.3f} meV")
+                # Adaptive y-lims for the shown slice (scaled by plot_margin)
+                ymin_candidates = [intensities[i].min(), all_residuals[i].min()]
+                ymax_candidates = [intensities[i].max(), all_residuals[i].max()]
+                if n_individuals:
+                    ymin_candidates.append(all_individual_results[i].min())
+                    ymax_candidates.append(all_individual_results[i].max())
+                ymin = plot_margin * float(min(ymin_candidates))
+                ymax = plot_margin * float(max(ymax_candidates))
+                ax.set_ylim(ymin, ymax)
 
-                # Redraw
+                # Update title and redraw
+                ax.set_title(f"Energy slice: {energies_sel[i] * kilo:.3f} meV")
                 fig.canvas.draw_idle()
 
             slider.on_changed(update)
@@ -1133,10 +1152,8 @@ class MDCs():
         if ax_annotate:
             tags = string.ascii_lowercase
             for i, axis in enumerate(fig.axes):
-                axis.annotate(
-                    f"({tags[i]})", xy=(0.05, 0.95),
-                    xycoords="axes fraction"
-                )
+                axis.annotate(f"({tags[i]})", xy=(0.05, 0.95),
+                    xycoords="axes fraction")
 
         is_interactive = hasattr(sys, 'ps1') or 'ipykernel' in sys.modules
         is_cli = not is_interactive

@@ -5,7 +5,7 @@
 import xarpes
 
 project = 'xARPES'
-copyright = '2024 xARPES Developers'
+copyright = '2025 xARPES Developers'
 version = xarpes.__version__
 release = xarpes.__version__
 

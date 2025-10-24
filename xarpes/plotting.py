@@ -19,12 +19,14 @@ def plot_settings(name='default'):
     mpl.rc('xtick', labelsize=10, direction='in')
     mpl.rc('ytick', labelsize=10, direction='in')
     lw = dict(default=2.0, large=4.0)[name]
-    mpl.rcParams['lines.linewidth'] = lw
-    mpl.rcParams['lines.markersize'] = 3
-    mpl.rcParams['xtick.major.size'] = 4
-    mpl.rcParams['xtick.minor.size'] = 2
-    mpl.rcParams['xtick.major.width'] = 0.8
-    mpl.rcParams.update({'font.size': 16})
+    mpl.rcParams.update({
+        'lines.linewidth': lw,
+        'lines.markersize': 3,
+        'xtick.major.size': 4,
+        'xtick.minor.size': 2,
+        'xtick.major.width': 0.8,
+        'font.size': 16,
+    })
     plt.rcParams['legend.frameon'] = False
 
 def get_ax_fig_plt(ax=None, **kwargs):

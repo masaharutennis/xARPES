@@ -4,16 +4,9 @@
 """The distributions used throughout the code."""
 
 import numpy as np
-from .functions import fit_leastsq, extend_function
+from .functions import extend_function
 from .plotting import get_ax_fig_plt, add_fig_kwargs
-
-# Physical constants
-k_B = 8.617e-5 # Boltzmann constant [eV / K]
-dtor = np.pi / 180 # Degrees to radians [rad / deg]
-pref = 3.80998211616 # hbar^2 / (2 m_e) [eV Angstrom^2]
-fwhm_to_std = np.sqrt(8 * np.log(2)) # Convert FWHM to std [-]
-sigma_extend = 5 # Extend data range by "5 sigma"
-
+from .constants import k_B, pref, dtor
 
 class CreateDistributions:
     r"""

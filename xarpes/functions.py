@@ -4,10 +4,7 @@
 """Separate functions mostly used in conjunction with various classes."""
 
 import numpy as np
-
-# Physical constants, default parameters
-fwhm_to_std = np.sqrt(8 * np.log(2)) # Convert FWHM to std [-]
-sigma_extend = 5 # Extend data range by "5 sigma"
+from .constants import fwhm_to_std, sigma_extend
 
 
 def build_distributions(distributions, parameters):
@@ -95,7 +92,6 @@ def residual(parameters, xdata, ydata, angle_resolution, new_distributions,
         if (matrix_element is not None) and isinstance(dist, Dispersion):
             part *= matrix_element(extend, **matrix_parameters)
 
-
         model += part
 
     model = gaussian_filter(model, sigma=step)[numb:-numb if numb else None]
@@ -139,8 +135,9 @@ def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
     residual : ndarray
         Normalized residuals between model and ydata.
     """
+    from scipy.ndimage import gaussian_filter
+
     if resolution:
-        from scipy.ndimage import gaussian_filter
         extend, step, numb = extend_function(xdata, resolution)
         model = gaussian_filter(function(extend, *p, *extra_args),
                                 sigma=step)
@@ -272,6 +269,7 @@ def download_examples():
         print('Failed to download the repository. Status code: '
              f'{response.status_code}')
         return 1
+
 
 def set_script_dir():
     r"""This function sets the directory such that the xARPES code can be

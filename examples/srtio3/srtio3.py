@@ -7,10 +7,8 @@
 import matplotlib as mpl
 mpl.use('Qt5Agg')
 
-
 import xarpes
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 
 xarpes.plot_settings('default')
@@ -23,6 +21,7 @@ extn = '.ibw' # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 
+
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
@@ -31,6 +30,7 @@ bmap = xarpes.BandMap(data_file_path, energy_resolution=0.01,
 
 fig = bmap.plot(abscissa='angle', ordinate='kinetic_energy', ax=ax)
 
+
 fig = bmap.fit_fermi_edge(hnuminphi_guess=42.24, background_guess=1e4,
                           integrated_weight_guess=1e6, angle_min=-5,
                           angle_max=5, ekin_min=42.22, ekin_max=42.3,
@@ -38,6 +38,7 @@ fig = bmap.fit_fermi_edge(hnuminphi_guess=42.24, background_guess=1e4,
 
 print('The optimised h nu - Phi = ' + f'{bmap.hnuminphi:.4f}' + ' +/- '
       + f'{bmap.hnuminphi_std:.4f}' + ' eV.')
+
 
 angle_min = 0.6
 angle_max = 4.8
@@ -49,6 +50,9 @@ fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
 fig = mdc.plot(ax=ax)
+
+import numpy as np
+
 
 fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
@@ -78,9 +82,9 @@ mat_args = {
 #  'theta_0' : 0.6
 }
 
-
 fig = mdc.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
                            ax=ax, matrix_args=mat_args, show=True)
+
 
 fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
@@ -97,8 +101,6 @@ angle_max = 4.8
 
 mdc = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
-# print(mdc.ekin)
-
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
@@ -108,13 +110,9 @@ ax = fig.gca()
 fig = mdc.plot(ax=ax)
 
 
-
 fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 fig, new_dists, covariance_matrix, new_mat_args = mdc.fit(
     distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
     energy_value=0, ax=ax, show=True)
-
-
-
