@@ -583,7 +583,6 @@ class BandMap:
     
 class MDCs():
     r"""
-    Enel can currently be a list for plotting, but not yet for fitting.
     """
     def __init__(self, intensities, angles, angle_resolution, enel, 
                  hnuminphi):
@@ -595,7 +594,7 @@ class MDCs():
         self._hnuminphi = hnuminphi
         self._ekin = self._enel + self._hnuminphi
 
-        self._enel_range = None
+        self._ekin_range = None
         self._individual_properties = None
         
     @property
@@ -643,12 +642,12 @@ class MDCs():
         self._intensities = x
 
     @property
-    def enel_range(self):
-        if self._enel_range is None:
+    def ekin_range(self):
+        if self._ekin_range is None:
             raise AttributeError(
-                "enel_range not yet set. Run `.fit_selection()` first."
+                "ekin_range not yet set. Run `.fit_selection()` first."
             )
-        return self._enel_range
+        return self._ekin_range
     
     @property
     def individual_labels(self):
@@ -1111,8 +1110,8 @@ class MDCs():
             all_residuals.append(residual_i)
             all_individual_results.append(np.vstack(indiv_rows))
 
-        # Set the enel_range variable
-        self._enel_range = kinergies - self.hnuminphi
+        # Set the ekin_range variable
+        self._ekin_range = kinergies
 
         # NEW: store aggregated dict instead of per-slice lists
         # (accessor will expose arrays)
@@ -1388,51 +1387,43 @@ class MDCs():
         return final_result
     
 
-    def expose_parameters(self, select_label,fermi_wavevector=None, fermi_velocity=None):
+    def expose_parameters(self, select_label,
+                        fermi_wavevector=None, fermi_velocity=None):
         r"""
-        Selects and returns the energy range together with the label and its
-        corresponding parameter subsets from `self._individual_properties`.
+        Selects and returns the fitted parameters for a given label, together
+        with optional user-specified physical parameters (as a dictionary).
 
         Parameters
         ----------
         select_label : str
             Label to look for among the fitted distributions.
         fermi_wavevector : float, optional
-            Optional Fermi wave vector to export to the self-energy constructor.
+            Optional Fermi wave vector to include.
         fermi_velocity : float, optional
-            Optional Fermi velocity to export to the self-energy constructor.
+            Optional Fermi velocity to include.
+        **kwargs :
+            Any other user-defined quantities to export.
 
         Returns
         -------
         tuple
-            (self._enel_range, self.hnuminphi, selected_label,
-            selected_properties, exported_parameters)
+            (ekin_range, hnuminphi, label, properties, exported_parameters)
 
-            where `exported_parameters` is always a 2-tuple
-            (fermi_wavevector, fermi_velocity), possibly containing None.
-
-        Raises
-        ------
-        AttributeError
-            If `_enel_range` or `_individual_properties` have not yet been set.
-        ValueError
-            If the given label is not found in any of the fitted distributions.
+            where `exported_parameters` is a dict containing all optional
+            quantities passed by the user.
         """
-        import numpy as np
-
-        if self._enel_range is None:
+        if self._ekin_range is None:
             raise AttributeError(
-                "enel_range not yet set. Run `.fit_selection()` first."
+                "ekin_range not yet set. Run `.fit_selection()` first."
             )
 
         store = getattr(self, "_individual_properties", None)
         if not store or select_label not in store:
-            if isinstance(store, dict):
-                all_labels = sorted(store.keys())
-            else:
-                all_labels = []
+            all_labels = (sorted(store.keys()) if isinstance(store, dict)
+                        else [])
             raise ValueError(
-                f"Label '{select_label}' not found in available labels: {all_labels}"
+                f"Label '{select_label}' not found in available labels: "
+                f"{all_labels}"
             )
 
         # Convert lists → numpy arrays
@@ -1447,11 +1438,14 @@ class MDCs():
             per_class_dicts[0] if len(per_class_dicts) == 1 else per_class_dicts
         )
 
-        # Always define exported_parameters as a fixed-length tuple
-        exported_parameters = (fermi_wavevector, fermi_velocity)
+        # Flexible dictionary of optional parameters
+        exported_parameters = {
+            "fermi_wavevector": fermi_wavevector,
+            "fermi_velocity": fermi_velocity,
+        }
 
         return (
-            self._enel_range,
+            self._ekin_range,
             self.hnuminphi,
             select_label,
             selected_properties,
@@ -1460,111 +1454,156 @@ class MDCs():
 
 
 class SelfEnergy:
-    r"""Class for the self-energy.
-    """
+    r"""Self-energy (ekin-leading; hnuminphi/ekin are read-only)."""
 
-    def __init__(self, enel_range, hnuminphi, label, properties, tupol):
-        self.enel_range = enel_range
-        self.hnuminphi = hnuminphi
-        self.label = label
+    def __init__(self, ekin_range, hnuminphi, label, properties, parameters):
+        # core read-only state
+        self._ekin_range = ekin_range
+        self._hnuminphi = hnuminphi
+        self._label = label
 
-        # Extract parameters automatically if they exist
-        self.amplitude = properties.get("amplitude")
-        self.peak = properties.get("peak")
-        self.broadening = properties.get("broadening")
+        # optional, user-supplied extras (can be set later)
+        self._parameters = dict(parameters or {})
+        self._fermi_wavevector = self._parameters.get("fermi_wavevector")
+        self._fermi_velocity = self._parameters.get("fermi_velocity")
 
-        # Storing the kinetic energy range
-        self._ekin_range = self._enel_range + self._hnuminphi
-
-        # Store class name (optional but informative)
+        # optional parameter arrays from fit
+        self._amplitude = properties.get("amplitude")
+        self._peak = properties.get("peak")
+        self._broadening = properties.get("broadening")
         self._class = properties.get("_class", None)
 
-        # Potentially parameter-dependent output
+        # lazy caches
         self._peak_positions = None
+        self._real = None  # real part cahce
+        self._imag = None  # imaginary part cache
 
-    # --- enel_range ---------------------------------------------------------
-    @property
-    def enel_range(self):
-        r"""Energy range associated with this self-energy."""
-        return self._enel_range
+    # ---------------- core read-only axes ----------------
 
-    @enel_range.setter
-    def enel_range(self, x):
-        self._enel_range = x
-
-    # --- ekin_range ---------------------------------------------------------
     @property
     def ekin_range(self):
-        r"""Kinetic-energy range = enel_range + hnuminphi (read-only)."""
-        import numpy as np
-        enel = np.asarray(self._enel_range)
+        return self._ekin_range
+
+    @property
+    def enel_range(self):
+        if self._ekin_range is None:
+            return None
         hnp = 0.0 if self._hnuminphi is None else self._hnuminphi
-        return enel + hnp
+        return np.asarray(self._ekin_range) - hnp
 
-    @ekin_range.setter
-    def ekin_range(self, _):
-        raise AttributeError("ekin_range is derived from enel_range + "
-                             "hnuminphi.")
-
-    # --- hnuminphi ----------------------------------------------------------
     @property
     def hnuminphi(self):
-        r"""
-        """
         return self._hnuminphi
 
-    @hnuminphi.setter
-    def hnuminphi(self, x):
-        self._hnuminphi= x
-
-    # --- label --------------------------------------------------------------
+    # ---------------- identifiers ----------------
     @property
     def label(self):
-        r"""Label identifying this self-energy instance."""
         return self._label
 
     @label.setter
     def label(self, x):
         self._label = x
 
-    # --- amplitude ----------------------------------------------------------
+    # ---------------- exported user parameters ----------------
+    @property
+    def parameters(self):
+        """Dictionary with user-supplied parameters (read-only view)."""
+        return self._parameters
+
+    @property
+    def fermi_wavevector(self):
+        """Optional k_F; can be set later."""
+        return self._fermi_wavevector
+
+    @fermi_wavevector.setter
+    def fermi_wavevector(self, x):
+        self._fermi_wavevector = x
+        self._parameters["fermi_wavevector"] = x
+        self._real = None # invalidate dependent cache
+
+    @property
+    def fermi_velocity(self):
+        """Optional v_F; can be set later."""
+        return self._fermi_velocity
+
+    @fermi_velocity.setter
+    def fermi_velocity(self, x):
+        self._fermi_velocity = x
+        self._parameters["fermi_velocity"] = x
+        self._imag = None # invalidate dependent cache
+        self._real = None # invalidate dependent cache
+
+    # ---------------- optional fit parameters ----------------
     @property
     def amplitude(self):
-        r"""Amplitude array (optional)."""
-        return getattr(self, "_amplitude", None)
+        return self._amplitude
 
     @amplitude.setter
     def amplitude(self, x):
         self._amplitude = x
 
-    # --- peak ---------------------------------------------------------------
     @property
     def peak(self):
-        r"""Peak positions array (optional)."""
-        return getattr(self, "_peak", None)
+        return self._peak
 
     @peak.setter
     def peak(self, x):
         self._peak = x
+        self._peak_positions = None # invalidate dependent cache
+        self._real = None # invalidate dependent cache
 
-    # --- broadening ---------------------------------------------------------
     @property
     def broadening(self):
-        r"""Broadening array (optional)."""
-        return getattr(self, "_broadening", None)
+        return self._broadening
 
     @broadening.setter
     def broadening(self, x):
         self._broadening = x
+        self._imag = None # invalidate dependent cache
 
-    # --- representation helper ---------------------------------------------
-    def __repr__(self):
-        return (f"<SelfEnergy(label='{self.label}', class='{self._class}', "
-                f"n={len(self.enel_range) if self.enel_range is not None else 0})>")
-    
+    # ---------------- derived outputs ----------------
     @property
     def peak_positions(self):
-        r"""Elementwise product: ekin_range * peak (lazy, cached)."""
+        r"""k_parallel = peak * dtor * sqrt(ekin_range / pref) (lazy)."""
         if getattr(self, "_peak_positions", None) is None:
-            self._peak_positions = self.peak * dtor * np.sqrt(self._ekin_range / pref)
+            if self._peak is None or self._ekin_range is None:
+                return None
+            self._peak_positions = (
+                np.asarray(self._peak) * dtor *
+                np.sqrt(np.asarray(self._ekin_range) / pref)
+            )
         return self._peak_positions
+
+    @property
+    def imag(self):
+        r"""-Σ'': v_F * sqrt(E_kin / pref) * broadening (lazy)."""
+        if getattr(self, "_imag", None) is None:
+            if self._fermi_velocity is None:
+                raise AttributeError(
+                    "Cannot compute `imag`: fermi_velocity not set. "
+                    "Provide it via `self.fermi_velocity = ...`."
+                )
+            if self._broadening is None or self._ekin_range is None:
+                return None
+            self._imag = self._fermi_velocity * np.sqrt(self._ekin_range / pref) * \
+                self._broadening
+            
+        return self._imag
+    
+    @property
+    def real(self):
+        r"""Real part of Σ (lazy, cached).
+        Depends on: fermi_velocity, fermi_wavevector, enel_range, peak.
+        """
+        if getattr(self, "_real", None) is None:
+            if self._fermi_velocity is None or self._fermi_wavevector is None:
+                raise AttributeError(
+                    "Cannot compute `real`: set both fermi_velocity and "
+                    "fermi_wavevector first."
+                )
+            if self._peak is None or self._ekin_range is None:
+                return None
+            self._real = self.enel_range - self._fermi_velocity * \
+            (self.peak_positions - self._fermi_wavevector)
+
+        return self._real

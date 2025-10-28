@@ -165,7 +165,7 @@ fig, new_distributions, covariance_matrix = mdcs.fit(
      distributions=guess_dists, energy_value=0.001, ax=ax)
 
 
-fig = plt.figure(figsize=(8, 6))
+fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 energy_range = [-0.25, 0.01]
@@ -175,16 +175,34 @@ mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range
 
 fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
-# from importlib import reload
-# import xarpes
-# reload(xarpes)       
 
-self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1', fermi_velocity=0.1))
+self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
+                                fermi_velocity=2.85, fermi_wavevector=0.358))
 
-# print(self_energy.ekin_range)
-# print(self_energy.peak_positions)
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+ax.scatter(self_energy.enel_range, self_energy.real, label =r"$\Sigma'(E)$")
+ax.scatter(self_energy.enel_range, self_energy.imag, label =r"$-\Sigma''(E)$")
+ax.set_xlabel(r'$E-\mu$ (eV)')
+ax.set_ylabel(r'$\Sigma(E)$ (eV)')
+
+plt.legend()
+plt.show()
+
+# # print(self_energy.imag)
+
+plt.scatter(self_energy.enel_range, self_energy.imag)
+
+plt.show()
 
 
+fig = plt.figure(figsize=(8, 5))
+ax = fig.gca()
+
+ax.plot(self_energy.peak_positions, self_energy.enel_range, color='tab:blue', linewidth=2)
+
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
 
 
