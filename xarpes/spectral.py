@@ -586,8 +586,24 @@ class MDCs:
     Momentum Distribution Curves (MDC) container for fitted ARPES data.
 
     Holds the raw intensity maps, angular and energy grids, and the
-    post-fit aggregated parameters and uncertainties produced by
-    `.fit_selection()`.
+    post-fit aggregated parameters produced by `.fit_selection()`.
+
+    Notes
+    -----
+    After calling `.fit_selection()`, `individual_properties` is a nested dict:
+        {
+            <label>: {
+                <class_name>: {
+                    'label': <label>,
+                    '_class': <class_name>,
+                    <param>: [values per slice],
+                    <param>_sigma: [1σ per slice or None],
+                    ...
+                }
+            }
+        }
+    where `<param>` ∈ {'offset','slope','amplitude','peak','broadening', ...}
+    and `<param>_sigma` is the uncertainty aligned 1:1 with `<param>`.
     """
 
     def __init__(self, intensities, angles, angle_resolution, enel, hnuminphi):
@@ -598,12 +614,9 @@ class MDCs:
         self._enel = enel
         self._hnuminphi = hnuminphi
 
-        # Derived attributes
+        # Derived attributes (populated by fit_selection)
         self._ekin_range = None
-
-        # Aggregated results (populated by fit_selection)
-        self._individual_properties = None
-        self._individual_uncertainties = None
+        self._individual_properties = None  # combined values + sigmas
 
     # -------------------- Immutable physics inputs --------------------
 
@@ -667,7 +680,7 @@ class MDCs:
     @property
     def individual_properties(self):
         """
-        Aggregated fitted parameter values per distribution component.
+        Aggregated fitted parameter values and uncertainties per component.
 
         Returns
         -------
@@ -678,7 +691,8 @@ class MDCs:
                     class_name: {
                         'label': label,
                         '_class': class_name,
-                        <param_name>: [values per slice],
+                        <param>:        [values per slice],
+                        <param>_sigma:  [1σ per slice or None],
                         ...
                     }
                 }
@@ -689,24 +703,6 @@ class MDCs:
                 "`individual_properties` not yet set. Run `.fit_selection()` first."
             )
         return self._individual_properties
-
-    @property
-    def individual_uncertainties(self):
-        """
-        Aggregated 1σ uncertainties aligned with `individual_properties`.
-
-        Returns
-        -------
-        dict
-            Same nested structure as `individual_properties`, but with
-            lists of uncertainty values (or None for fixed parameters).
-        """
-        if self._individual_uncertainties is None:
-            raise AttributeError(
-                "`individual_uncertainties` not yet set. Run `.fit_selection()` first."
-            )
-        return self._individual_uncertainties
-
 
     def energy_check(self, energy_value):
         r"""
@@ -735,7 +731,6 @@ class MDCs:
                         f"({self.enel.min():.3f} – {self.enel.max():.3f}) "
                         "of the MDC collection."
                     )
-
 
         return counts, kinergy
 
@@ -960,47 +955,11 @@ class MDCs:
         import string
         import sys
         import warnings
-        import re
         from lmfit import Minimizer
         from scipy.ndimage import gaussian_filter
         from .functions import construct_parameters, build_distributions, \
-            residual
+            residual, resolve_param_name
         
-        def _resolve_param_name(params, label, pname):
-            """
-            Try to find the lmfit param key corresponding to this component `label`
-            and bare parameter name `pname` (e.g., 'amplitude', 'peak', 'broadening').
-            Works with common token separators.
-            """
-            names = list(params.keys())
-            # Fast exact candidates
-            candidates = (
-                f"{pname}_{label}", f"{label}_{pname}",
-                f"{pname}:{label}", f"{label}:{pname}",
-                f"{label}.{pname}", f"{label}|{pname}",
-                f"{label}-{pname}", f"{pname}-{label}",
-            )
-            for c in candidates:
-                if c in params:
-                    return c
-
-            # Regex fallback: label and pname as tokens in any order
-            esc_l = re.escape(str(label))
-            esc_p = re.escape(str(pname))
-            tok = r"[.:/_\-]"  # common separators
-            pat = re.compile(rf"(^|{tok}){esc_l}({tok}|$).*({tok}){esc_p}({tok}|$)")
-            for n in names:
-                if pat.search(n):
-                    return n
-
-            # Last resort: unique tail match on pname that also contains the label somewhere
-            tails = [n for n in names if n.endswith(pname) and str(label) in n]
-            if len(tails) == 1:
-                return tails[0]
-
-            # Give up
-            return None
-
         # Wrapper kwargs
         title = kwargs.pop("title", None)
         savefig = kwargs.pop("savefig", None)
@@ -1061,7 +1020,6 @@ class MDCs:
         all_individual_results = [] # List of (n_individuals, n_angles)
 
         aggregated_properties = {}
-        aggregated_uncertainties = {}
 
         # map class_name -> parameter names to extract
         param_spec = {
@@ -1095,15 +1053,11 @@ class MDCs:
 
             pcov = outcome.covar
 
-            # lmfit gives var_names for the covariance order (varying params only)
             var_names = getattr(outcome, 'var_names', None)
             if not var_names:
                 var_names = [n for n, p in outcome.params.items() if p.vary]
-
             var_idx = {n: i for i, n in enumerate(var_names)}
 
-            # Build a FULL map: every param name -> sigma (sqrt diag if available, 
-            # else stderr, else None)
             param_sigma_full = {}
             for name, par in outcome.params.items():
                 sigma = None
@@ -1171,24 +1125,23 @@ class MDCs:
                 # ensure dicts exist
                 label_bucket = aggregated_properties.setdefault(label, {})
                 class_bucket = label_bucket.setdefault(cls, {'label': label, '_class': cls})
-                unc_label_bucket = aggregated_uncertainties.setdefault(label, {})
-                unc_class_bucket = unc_label_bucket.setdefault(cls, {'label': label, '_class': cls})
-                # ensure keys exist
 
+                # ensure keys for both values and sigmas
                 for pname in wanted:
                     class_bucket.setdefault(pname, [])
-                    unc_class_bucket.setdefault(pname, [])
+                    class_bucket.setdefault(f"{pname}_sigma", [])
 
+                # append values and sigmas in the order of slices
                 for pname in wanted:
-                    param_key = _resolve_param_name(outcome.params, label, pname)
+                    param_key = resolve_param_name(outcome.params, label, pname)
 
                     if param_key is not None and param_key in outcome.params:
                         class_bucket[pname].append(outcome.params[param_key].value)
-                        unc_class_bucket[pname].append(param_sigma_full.get(param_key, None))
+                        class_bucket[f"{pname}_sigma"].append(param_sigma_full.get(param_key, None))
                     else:
-                        # Fallback to attribute on the distribution (not fitted this slice)
+                        # Not fitted in this slice → keep the value if present on the dist, sigma=None
                         class_bucket[pname].append(getattr(dist, pname, None))
-                        unc_class_bucket[pname].append(None)
+                        class_bucket[f"{pname}_sigma"].append(None)
 
             # final (sum) curve, smoothed & cropped
             final_result_i = gaussian_filter(total_result_ext, sigma=step)[
@@ -1205,7 +1158,6 @@ class MDCs:
 
         self._ekin_range = kinergies
         self._individual_properties = aggregated_properties
-        self._individual_uncertainties = aggregated_uncertainties
 
         if np.isscalar(energies):
             # One slice only: plot MDC, Fit, Residual, and Individuals
@@ -1478,10 +1430,10 @@ class MDCs:
     
 
     def expose_parameters(self, select_label, fermi_wavevector=None, 
-                          fermi_velocity=None):
+                        fermi_velocity=None):
         r"""
-        Selects and returns the fitted parameters for a given label, together
-        with optional user-specified physical parameters (as a dictionary).
+        Select and return fitted parameters for a given component label, plus a
+        flat export dictionary containing values **and** 1σ uncertainties.
 
         Parameters
         ----------
@@ -1491,51 +1443,70 @@ class MDCs:
             Optional Fermi wave vector to include.
         fermi_velocity : float, optional
             Optional Fermi velocity to include.
-        **kwargs :
-            Any other user-defined quantities to export.
 
         Returns
         -------
-        tuple
-            (ekin_range, hnuminphi, label, properties, exported_parameters)
-
-            where `exported_parameters` is a dict containing all optional
-            quantities passed by the user.
+        ekin_range : np.ndarray
+            Kinetic-energy grid corresponding to the selected label.
+        hnuminphi : float
+            Photoelectron work-function offset.
+        label : str
+            Label of the selected distribution.
+        selected_properties : dict or list of dict
+            Nested dictionary (or list thereof) containing <param> and 
+            <param>_sigma arrays.
+        exported_parameters : dict
+            Flat dictionary of parameters and their uncertainties, plus optional
+            Fermi quantities. Each key may be of the form "<class>.<param>"
         """
+
         if self._ekin_range is None:
-            raise AttributeError(
-                "ekin_range not yet set. Run `.fit_selection()` first."
-            )
+            raise AttributeError("ekin_range not yet set. Run `.fit_selection()` first.")
 
         store = getattr(self, "_individual_properties", None)
         if not store or select_label not in store:
-            all_labels = (sorted(store.keys()) if isinstance(store, dict)
-                        else [])
+            all_labels = (sorted(store.keys()) if isinstance(store, dict) else [])
             raise ValueError(
-                f"Label '{select_label}' not found in available labels: "
-                f"{all_labels}"
+                f"Label '{select_label}' not found in available labels: {all_labels}"
             )
 
-        # Convert lists → numpy arrays
+        # Convert lists → numpy arrays within the selected label’s classes
         per_class_dicts = []
         for cls, bucket in store[select_label].items():
             dct = {}
             for k, v in bucket.items():
-                dct[k] = v if k in ("label", "_class") else np.asarray(v)
+                if k in ("label", "_class"):
+                    dct[k] = v
+                else:
+                    dct[k] = np.asarray(v)
             per_class_dicts.append(dct)
 
         selected_properties = (
             per_class_dicts[0] if len(per_class_dicts) == 1 else per_class_dicts
         )
 
-        # Flexible dictionary of optional parameters
+        # Build a flat export dictionary with values and sigmas side-by-side.
         exported_parameters = {
             "fermi_wavevector": fermi_wavevector,
             "fermi_velocity": fermi_velocity,
         }
 
+        # Iterate the per-class dict(s) and namespace keys as "<class>.<param>"
+        def _pack(cls_bucket):
+            cls = cls_bucket.get("_class", "UnknownClass")
+            for key, arr in cls_bucket.items():
+                if key in ("label", "_class"):
+                    continue
+                exported_parameters[f"{cls}.{key}"] = arr
+
+        if isinstance(selected_properties, dict):
+            _pack(selected_properties)
+        else:
+            for cls_bucket in selected_properties:
+                _pack(cls_bucket)
+
         return self._ekin_range, self.hnuminphi, select_label, \
-            selected_properties, exported_parameters
+            selected_properties,exported_parameters,
 
 
 class SelfEnergy:
@@ -1547,21 +1518,38 @@ class SelfEnergy:
         self._hnuminphi = hnuminphi
         self._label = label
 
+        # accept either a dict or a single-element list of dicts
+        if isinstance(properties, list):
+            if len(properties) == 1:
+                properties = properties[0]
+            else:
+                raise ValueError("`properties` must be a dict or a single " \
+                "dict in a list.")
+
+        # single source of truth for all params (+ their *_sigma)
+        self._properties = dict(properties or {})
+        self._class = self._properties.get("_class", None)
+
         # optional, user-supplied extras (can be set later)
         self._parameters = dict(parameters or {})
         self._fermi_wavevector = self._parameters.get("fermi_wavevector")
-        self._fermi_velocity = self._parameters.get("fermi_velocity")
+        self._fermi_velocity  = self._parameters.get("fermi_velocity")
 
-        # optional parameter arrays from fit
-        self._amplitude = properties.get("amplitude")
-        self._peak = properties.get("peak")
-        self._broadening = properties.get("broadening")
-        self._class = properties.get("_class", None)
+        # convenience attributes (read from properties)
+        self._amplitude        = self._properties.get("amplitude")
+        self._amplitude_sigma  = self._properties.get("amplitude_sigma")
+        self._peak             = self._properties.get("peak")
+        self._peak_sigma       = self._properties.get("peak_sigma")
+        self._broadening       = self._properties.get("broadening")
+        self._broadening_sigma = self._properties.get("broadening_sigma")
 
         # lazy caches
         self._peak_positions = None
-        self._real = None  # real part cahce
-        self._imag = None  # imaginary part cache
+        self._peak_positions_sigma = None
+        self._real = None
+        self._real_sigma = None
+        self._imag = None
+        self._imag_sigma = None
 
     # ---------------- core read-only axes ----------------
 
@@ -1604,7 +1592,9 @@ class SelfEnergy:
     def fermi_wavevector(self, x):
         self._fermi_wavevector = x
         self._parameters["fermi_wavevector"] = x
-        self._real = None # invalidate dependent cache
+        # invalidate dependent cache
+        self._real = None
+        self._real_sigma = None
 
     @property
     def fermi_velocity(self):
@@ -1615,36 +1605,71 @@ class SelfEnergy:
     def fermi_velocity(self, x):
         self._fermi_velocity = x
         self._parameters["fermi_velocity"] = x
-        self._imag = None # invalidate dependent cache
-        self._real = None # invalidate dependent cache
+         # invalidate dependent cache
+        self._imag = None
+        self._imag_sigma = None
+        self._real = None
+        self._real_sigma = None
 
-    # ---------------- optional fit parameters ----------------
+    # ---------------- optional fit parameters (convenience) ----------------
     @property
     def amplitude(self):
         return self._amplitude
-
     @amplitude.setter
     def amplitude(self, x):
         self._amplitude = x
+        self._properties["amplitude"] = x
+
+    @property
+    def amplitude_sigma(self):
+        return self._amplitude_sigma
+    @amplitude_sigma.setter
+    def amplitude_sigma(self, x):
+        self._amplitude_sigma = x
+        self._properties["amplitude_sigma"] = x
 
     @property
     def peak(self):
         return self._peak
-
+    
     @peak.setter
     def peak(self, x):
         self._peak = x
-        self._peak_positions = None # invalidate dependent cache
-        self._real = None # invalidate dependent cache
+        self._properties["peak"] = x
+        # invalidate dependent cache
+        self._peak_positions = None
+        self._real = None
+
+    @property
+    def peak_sigma(self):
+        return self._peak_sigma
+    
+    @peak_sigma.setter
+    def peak_sigma(self, x):
+        self._peak_sigma = x
+        self._properties["peak_sigma"] = x
+        self._peak_positions_sigma = None
+        self._real_sigma = None
 
     @property
     def broadening(self):
         return self._broadening
-
+    
     @broadening.setter
     def broadening(self, x):
         self._broadening = x
-        self._imag = None # invalidate dependent cache
+        self._properties["broadening"] = x
+        self._imag = None
+
+    @property
+    def broadening_sigma(self):
+        return self._broadening_sigma
+    
+    @broadening_sigma.setter
+    def broadening_sigma(self, x):
+        self._broadening_sigma = x
+        self._properties["broadening_sigma"] = x
+        self._imag_sigma = None
 
     # ---------------- derived outputs ----------------
     @property
@@ -1653,11 +1678,20 @@ class SelfEnergy:
         if getattr(self, "_peak_positions", None) is None:
             if self._peak is None or self._ekin_range is None:
                 return None
-            self._peak_positions = (
-                np.asarray(self._peak) * dtor *
+            self._peak_positions = self._peak * dtor * \
                 np.sqrt(np.asarray(self._ekin_range) / pref)
-            )
         return self._peak_positions
+
+    @property
+    def peak_positions_sigma(self):
+        r"""Std. dev. of k_parallel = peak * dtor * sqrt(ekin_range / pref)
+          (lazy)."""
+        if getattr(self, "_peak_positions_sigma", None) is None:
+            if self._peak_sigma is None or self._ekin_range is None:
+                return None
+            self._peak_positions_sigma = self._peak_sigma * dtor * \
+                np.sqrt(np.asarray(self._ekin_range) / pref)
+        return self._peak_positions_sigma
 
     @property
     def imag(self):
@@ -1670,25 +1704,49 @@ class SelfEnergy:
                 )
             if self._broadening is None or self._ekin_range is None:
                 return None
-            self._imag = self._fermi_velocity * np.sqrt(self._ekin_range / pref) * \
-                self._broadening
-            
+            self._imag = self._fermi_velocity * np.sqrt(self._ekin_range \
+                                                    / pref) * self._broadening
         return self._imag
-    
+
+    @property
+    def imag_sigma(self):
+        r"""Std. dev. of -Σ'': v_F * sqrt(E_kin / pref) * broadening (lazy)."""
+        if getattr(self, "_imag_sigma", None) is None:
+            if self._fermi_velocity is None:
+                raise AttributeError(
+                    "Cannot compute `imag_sigma`: fermi_velocity not set. "
+                    "Provide it via `self.fermi_velocity = ...`."
+                )
+            if self._broadening_sigma is None or self._ekin_range is None:
+                return None
+            self._imag_sigma = self._fermi_velocity * np.sqrt( \
+                self._ekin_range / pref) * self._broadening_sigma
+        return self._imag_sigma
+
     @property
     def real(self):
-        r"""Real part of Σ (lazy, cached).
-        Depends on: fermi_velocity, fermi_wavevector, enel_range, peak.
-        """
+        r"""Σ' (lazy, cached). Depends on: v_F, k_F, enel_range, peak."""
         if getattr(self, "_real", None) is None:
             if self._fermi_velocity is None or self._fermi_wavevector is None:
                 raise AttributeError(
-                    "Cannot compute `real`: set both fermi_velocity and "
+                    "Cannot compute `real`: set both fermi_velocity and " \
                     "fermi_wavevector first."
                 )
             if self._peak is None or self._ekin_range is None:
                 return None
             self._real = self.enel_range - self._fermi_velocity * \
             (self.peak_positions - self._fermi_wavevector)
-
         return self._real
+
+    @property
+    def real_sigma(self):
+        r"""Std. dev. of Σ' (lazy). Depends on: v_F and peak_positions_sigma."""
+        if getattr(self, "_real_sigma", None) is None:
+            if self._fermi_velocity is None:
+                raise AttributeError("Cannot compute `real_sigma`: set " \
+                "fermi_velocity first.")
+            if self._peak_sigma is None or self._ekin_range is None:
+                return None
+            self._real_sigma = self._fermi_velocity * \
+                self.peak_positions_sigma
+        return self._real_sigma

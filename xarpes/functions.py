@@ -6,6 +6,42 @@
 import numpy as np
 from .constants import fwhm_to_std, sigma_extend
 
+def resolve_param_name(params, label, pname):
+    """
+    Try to find the lmfit param key corresponding to this component `label`
+    and bare parameter name `pname` (e.g., 'amplitude', 'peak', 'broadening').
+    Works with common token separators.
+    """
+    import re
+    names = list(params.keys())
+    # Fast exact candidates
+    candidates = (
+        f"{pname}_{label}", f"{label}_{pname}",
+        f"{pname}:{label}", f"{label}:{pname}",
+        f"{label}.{pname}", f"{label}|{pname}",
+        f"{label}-{pname}", f"{pname}-{label}",
+    )
+    for c in candidates:
+        if c in params:
+            return c
+
+    # Regex fallback: label and pname as tokens in any order
+    esc_l = re.escape(str(label))
+    esc_p = re.escape(str(pname))
+    tok = r"[.:/_\-]"  # common separators
+    pat = re.compile(rf"(^|{tok}){esc_l}({tok}|$).*({tok}){esc_p}({tok}|$)")
+    for n in names:
+        if pat.search(n):
+            return n
+
+    # Last resort: unique tail match on pname that also contains the label somewhere
+    tails = [n for n in names if n.endswith(pname) and str(label) in n]
+    if len(tails) == 1:
+        return tails[0]
+
+    # Give up
+    return None
+
 
 def build_distributions(distributions, parameters):
     r"""TBD

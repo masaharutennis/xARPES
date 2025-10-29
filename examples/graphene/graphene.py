@@ -179,28 +179,21 @@ fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
                                 fermi_velocity=2.85, fermi_wavevector=0.358))
 
-prct = self_energy.fermi_velocity * np.sqrt(self_energy.ekin_range / 3.81)
-
-import numpy as np
-uncs = np.array(mdcs.individual_uncertainties['Linear_test_1']['SpectralLinear']['broadening'])
-
-
 fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
+from xarpes.constants import stdv
+
 # ax.scatter(self_energy.enel_range, self_energy.real, label =r"$\Sigma'(E)$")
-ax.errorbar(self_energy.enel_range, self_energy.imag, yerr=1.96 * prct * uncs, label =r"$-\Sigma''(E)$")
-ax.set_xlabel(r'$E-\mu$ (eV)')
-ax.set_ylabel(r'$\Sigma(E)$ (eV)')
+ax.errorbar(self_energy.enel_range, self_energy.imag, 
+            yerr=stdv * self_energy.imag_sigma, label =r"$-\Sigma''(E)$")
+ax.errorbar(self_energy.enel_range, self_energy.real, 
+            yerr=stdv * self_energy.real_sigma, label =r"$\Sigma'(E)$")
+ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r'$\Sigma(E)$ (eV)')
 
-plt.legend()
-plt.show()
+plt.legend(); plt.show()
 
-# # print(self_energy.imag)
 
-plt.scatter(self_energy.enel_range, self_energy.imag)
-
-plt.show()
 
 
 fig = plt.figure(figsize=(8, 5))
@@ -286,3 +279,5 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 # ax = fig.gca()
 
 # fig = mdcs.plot(distributions=guess_dists, ax=ax, energy_value=-0.003)
+
+
