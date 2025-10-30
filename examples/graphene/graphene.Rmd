@@ -225,6 +225,15 @@ fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 ```
 
 ```{python}
+# %matplotlib widget
+
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
+```
+
+```{python}
 # %matplotlib inline
 
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',

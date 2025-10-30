@@ -176,6 +176,12 @@ mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range
 fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
 
+fig = plt.figure(figsize=(7, 5))
+ax = fig.gca()
+
+fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
+
+
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
                                 fermi_velocity=2.85, fermi_wavevector=0.358))
 
