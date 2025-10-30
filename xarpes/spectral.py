@@ -1029,7 +1029,10 @@ class MDCs:
             'SpectralQuadratic': ('amplitude', 'peak', 'broadening'),
         }
 
-        for kinergy, intensity in zip(kinergies, intensities):
+        order = np.argsort(kinergies)[::-1]
+        for idx in order:
+            kinergy   = kinergies[idx]
+            intensity = intensities[idx]
             if matrix_element is not None:
                 parameters, element_names = construct_parameters(
                     new_distributions, matrix_args)
@@ -1155,6 +1158,21 @@ class MDCs:
             all_final_results.append(final_result_i)
             all_residuals.append(residual_i)
             all_individual_results.append(np.vstack(indiv_rows))
+
+        # --- after the reversed-order loop, restore original (ascending) order ---
+        inverse_order = np.argsort(np.argsort(kinergies)[::-1])
+
+        # Reorder per-slice arrays/lists computed in the loop
+        all_final_results[:]      = [all_final_results[i]      for i in inverse_order]
+        all_residuals[:]          = [all_residuals[i]          for i in inverse_order]
+        all_individual_results[:] = [all_individual_results[i] for i in inverse_order]
+
+        # Reorder all per-slice lists in aggregated_properties
+        for label_dict in aggregated_properties.values():
+            for cls_dict in label_dict.values():
+                for key, val in cls_dict.items():
+                    if isinstance(val, list) and len(val) == len(kinergies):
+                        cls_dict[key] = [val[i] for i in inverse_order]
 
         self._ekin_range = kinergies
         self._individual_properties = aggregated_properties
@@ -1678,8 +1696,8 @@ class SelfEnergy:
         if getattr(self, "_peak_positions", None) is None:
             if self._peak is None or self._ekin_range is None:
                 return None
-            self._peak_positions = self._peak * dtor * \
-                np.sqrt(np.asarray(self._ekin_range) / pref)
+            self._peak_positions = np.sqrt(self._ekin_range / pref) * \
+                np.sin(self._peak * dtor)
         return self._peak_positions
 
     @property
@@ -1689,8 +1707,8 @@ class SelfEnergy:
         if getattr(self, "_peak_positions_sigma", None) is None:
             if self._peak_sigma is None or self._ekin_range is None:
                 return None
-            self._peak_positions_sigma = self._peak_sigma * dtor * \
-                np.sqrt(np.asarray(self._ekin_range) / pref)
+            self._peak_positions_sigma = np.abs(np.sqrt(self._ekin_range / pref) \
+                        * np.cos(self._peak * dtor) * self._peak_sigma * dtor)
         return self._peak_positions_sigma
 
     @property

@@ -83,14 +83,12 @@ ax = fig.gca()
 fig = mdcs.plot(ax=ax)
 
 # Subsequent plot customization
-# ax.set_xlim([2, 10])
-# ax.set_ylim([0, 10000])
+# ax.set_xlim([2, 10]); # ax.set_ylim([0, 10000])
 
 # change = xarpes.SpectralLinear(amplitude=500, peak=7.5, broadening=0.01,
 #                                name='Linear_test', index='1')
 
 # change.broadening = 0.02
-
 # print(change.broadening)
 
 
@@ -176,12 +174,6 @@ mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range
 fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
-
-
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
                                 fermi_velocity=2.85, fermi_wavevector=0.358))
 
@@ -195,25 +187,21 @@ ax.errorbar(self_energy.enel_range, self_energy.imag,
             yerr=stdv * self_energy.imag_sigma, label =r"$-\Sigma''(E)$")
 ax.errorbar(self_energy.enel_range, self_energy.real, 
             yerr=stdv * self_energy.real_sigma, label =r"$\Sigma'(E)$")
-ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r'$\Sigma(E)$ (eV)')
+ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r"$\Sigma'(E), -\Sigma''(E)$ (eV)")
 
 plt.legend(); plt.show()
-
-
 
 
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
-ax.plot(self_energy.peak_positions, self_energy.enel_range, color='tab:blue', linewidth=2)
+from xarpes.constants import stdv
+
+ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
+            xerr=stdv * self_energy.peak_positions_sigma,
+           markersize=2, color='tab:blue', label=self_energy.label)
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
-
-
-
-
-
-
 
 
 angle_min2 = -1e6
@@ -232,9 +220,7 @@ ax = fig.gca()
 
 fig = mdc2.visualize_guess(distributions=guess_dists2, energy_value=0, ax=ax)
 
-
-# fig = plt.figure(figsize=(8, 6))
-# ax = fig.gca()
+# Fit without showing output
 
 fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
 
@@ -244,9 +230,15 @@ self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
-ax.plot(self_left.peak_positions, self_left.enel_range, color='tab:red', linewidth=2)
+from xarpes.constants import stdv
 
-ax.plot(self_energy.peak_positions, self_energy.enel_range, color='tab:blue', linewidth=2)
+ax.errorbar(self_left.peak_positions, self_left.enel_range, 
+            xerr=stdv * self_left.peak_positions_sigma,
+           markersize=2, color='tab:red', label=self_left.label)
+
+ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
+            xerr=stdv * self_energy.peak_positions_sigma,
+           markersize=2, color='tab:blue', label=self_energy.label)
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
