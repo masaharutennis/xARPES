@@ -48,44 +48,64 @@ def run_jupytext_ipynb_to_rmd(ipynb_path: str) -> bool:
 
 def convert_rmd_to_py(rmd_path: str) -> None:
     """
-    Convert a single .Rmd file to a .py script according to the original rules.
+    Convert a single .Rmd file to a .py script:
+    - YAML front matter is skipped
+    - Markdown outside code fences is commented with '# '
+    - Code inside fences (``` or ~~~) is written verbatim (with existing magic handling)
     """
     py_path = rmd_path[:-3] + "py"  # replace .Rmd with .py
     with open(rmd_path, "r", encoding="utf-8") as lines, open(py_path, "w", encoding="utf-8") as text:
         text.write("#!/usr/bin/env python3\n")
         first_magic_comment = True
         in_yaml = False
+        in_code = False  # track fenced code blocks
 
-        for line in lines:
-            # Skip YAML header (between --- lines)
-            if line.startswith("---"):
+        for raw in lines:
+            line = raw
+
+            # ---- YAML front matter ------------------------------------------------
+            if line.startswith("---") and not in_code:
                 in_yaml = not in_yaml
                 continue
             if in_yaml:
                 continue
 
-            # Skip fenced code markers
-            if line.startswith("```"):
+            # ---- Fence open/close (```... or ~~~...) ------------------------------
+            # Rmd/Quarto code chunks: ```{python, echo=FALSE} ... ```
+            if (line.lstrip().startswith("```") or line.lstrip().startswith("~~~")) and not in_yaml:
+                in_code = not in_code
+                # Do not emit the fence line itself
                 continue
 
-            # Skip lines marked as "Jupyter only"
-            if "Jupyter only" in line:
-                continue
+            if in_code:
+                # ---- Inside code fence: keep code, apply your filters --------------
+                # Skip lines marked as "Jupyter only"
+                if "Jupyter only" in line:
+                    continue
 
-            # Remove IPython magics
-            if "%matplotlib widget" in line or "%matplotlib inline" in line:
-                continue
+                # Remove IPython magics
+                if "%matplotlib widget" in line or "%matplotlib inline" in line:
+                    continue
 
-            # Replace first Jupyter magic comment with Qt5Agg backend
-            if line.replace(" ", "").startswith("#%"):
-                if first_magic_comment:
-                    text.write("import matplotlib as mpl\n")
-                    text.write("mpl.use('Qt5Agg')\n")
-                    first_magic_comment = False
-                continue
+                # Replace first Jupyter magic comment with Qt5Agg backend
+                # (lines like "# %load_ext ..." often end up as "#%..." after export)
+                if line.replace(" ", "").startswith("#%"):
+                    if first_magic_comment:
+                        text.write("import matplotlib as mpl\n")
+                        text.write("mpl.use('Qt5Agg')\n")
+                        first_magic_comment = False
+                    continue
 
-            # Otherwise write the line verbatim
-            text.write(line)
+                # Otherwise, write code verbatim
+                text.write(line)
+            else:
+                # ---- Outside code fence: Markdown -> Python comments ---------------
+                if line.strip() == "":
+                    # Preserve blank lines (safe in Python)
+                    text.write("\n")
+                else:
+                    # Comment any Markdown/text line so it doesn't break execution
+                    text.write("# " + line)
 
 def main() -> None:
     base_dir = find_base_dir()

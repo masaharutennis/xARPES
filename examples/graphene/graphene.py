@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-# Intercalated graphene
-### In this example, we extract the self-energies and Eliashberg function of
-### intercalated graphene.
-### Data have been provided with permission from re-use, originating from
-### https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.085132.
+# # Intercalated graphene
+# ### In this example, we extract the self-energies and Eliashberg function of
+# ### intercalated graphene.
+# ### Data have been provided with permission from re-use, originating from
+# ### https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.085132.
 
 import matplotlib as mpl
 mpl.use('Qt5Agg')

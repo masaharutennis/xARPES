@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# $\rm{SrTiO}_3$ example
-### In this example, we extract the self-energies and Eliashberg function from  
-### a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of $\rm{SrTiO}_3$.
+# # $\rm{SrTiO}_3$ example
+# ### In this example, we extract the self-energies and Eliashberg function from  
+# ### a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of $\rm{SrTiO}_3$.
 
 import matplotlib as mpl
 mpl.use('Qt5Agg')
@@ -84,7 +84,7 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
 #                          matrix_args=mat_args, ax=ax)
 
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', 
-                                bare_mass=0.6, fermi_wavevector=0.14, side='right'))
+                                bare_mass=0.6, fermi_wavevector=0.142, side='right'))
 
 self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2',
                                 bare_mass=0.6, fermi_wavevector=0.207))
@@ -109,8 +109,6 @@ ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r"$\Sigma'(E), -\Sigma''(E)$ (eV)"
 ax.set_ylim([0, 0.06])
 
 plt.legend(); plt.show()
-
-
 
 
 fig = plt.figure(figsize=(10, 7))
@@ -368,10 +366,13 @@ fig = mdcs.fit_selection(distributions=new_dists, matrix_element=mat_el,
 # fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
 #                          matrix_args=mat_args, ax=ax)
 
-For quadratic bands, the user has to explicitly assign the peaks as left-hand or right-hand side.
-In theory, one could incorporate such information in a minus sign of the peak position.
-However, this would also require setting boundaries for the fitting range.
-Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
+
+
+# ##### Notes for quadratic bands
+# - The user has to explicitly assign the peaks as left-hand or right-hand side.  
+# - In theory, one could incorporate such information in a minus sign of the peak position.  
+# - However, this would also require setting boundaries for the fitting range.  
+# - Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
 
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', side='right'))
 
