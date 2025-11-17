@@ -4,81 +4,148 @@
 
 Repository for the code xARPES &ndash; extraction from angle resolved photoemission spectra.
 
-# Installation
+# Warning
 
-xARPES can be installed with `pip`:
+This project is currently undergoing **beta testing**. Some functionalities from the accompanying preprint (https://arxiv.org/abs/2508.13845) are still missing. If you encounter any bugs, you can open an issue.
 
-	python3 -m pip install xarpes
+# Contributing
 
-Or with `conda`:
+Contributions to the code are most welcome. xARPES is intended to co-develop alongside the increasing complexity of experimental ARPES data sets. Contributions can be made by forking the code and creating a pull request. Importing of file formats from different beamlines is particularly encouraged.
 
-	conda install conda-forge::xarpes
+# Installing xARPES using a graphical package manager
 
-More detailed instructions for installing the development version, tested for recent Ubuntu and Debian GNU/Linux, are provided below.
+Some users may prefer not to install xARPES via the command line.  
+Most Python development environments include a graphical or integrated package manager that can install packages from either **PyPI** or **conda-forge**, depending on which environment you are using.
 
-## pip
+Below is a brief guide to the most common tools.
 
-It is highly recommended to set up a pristine Python virtual environment. First, the `venv` module might have to be installed:
+## If you are using Anaconda Navigator
 
-	sudo apt install python3-venv
+Anaconda Navigator installs Python packages from **conda-forge** when the environment is configured to use that channel.
 
-Afterwards, one can activate a virtual environment named `<my_venv>` using:
+1. Open *Anaconda Navigator*  
+2. Select your environment (or create a new one)
+3. Switch the package channel to **conda-forge**
+4. Search for `xarpes`
+5. Click **Install**
 
-	python3 -m venv <my_venv>
+This installs the latest stable version from conda-forge.
 
-It has to be activated whenever installing/running xARPES:
+## If you are using PyCharm, VS Code, Spyder, or JupyterLab
 
-	source <my_venv>/bin/activate
+These IDEs use the package source associated with your active environment:
 
-It is recommended to upgrade `pip` to the latest version:
+- If the active environment is a **conda environment**, packages typically come from **conda-forge** (if the channel is enabled).
+- If the active environment is a **venv** or **system Python**, packages come from **PyPI**.
 
-	python3 -m pip install --upgrade pip
+### Installation steps (generic)
 
-Finally, the installation can be performed:
+1. Open your IDE  
+2. Select or create a Python environment  
+3. Open the environment/package manager panel  
+4. Search for `xarpes`  
+5. Click **Install**
 
-	git clone git@github.com:xARPES/xARPES.git
-	cd xARPES
-	python3 -m pip install -e .
+This uses:
+- **PyPI** for standard Python environments
+- **conda-forge** for conda environments
 
-## conda
+# Pip installation
 
-The user is assumed to be in a pristine virtual environment provided by conda. First, download the required version for your operating system from <https://docs.anaconda.com/free/miniconda/>. For example:
+The following steps describe how to install xARPES in a clean Python virtual environment using `pip`.  
+These instructions apply to both user installation (from PyPI) and developer installation (from GitHub).
 
-	wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+## Setting up the environment
 
-Start the installation:
+It is highly recommended to set up a pristine Python virtual environment.  
+First, the `venv` module may have to be installed:
 
-	bash Miniconda3-latest-Linux-x86_64.sh
+    sudo apt install python3-venv
 
-Then press Enter to get to the end of the license agreement, and answer `yes` to the following question:
+Create a virtual environment named `<my_venv>`:
 
-	Do you accept the license terms? [yes|no]
+    python3 -m venv <my_venv>
 
-Also specify your installation location.
+Activate it whenever installing or running xARPES:
 
-It is convenient to also answer `yes` to the following, which will append new lines to your `~/.bashrc`:
+    source <my_venv>/bin/activate
 
-	You can undo this by running `conda init --reverse $SHELL`? [yes|no]
+Upgrade pip:
 
-A conda base environment is then activated with `source ~/.bashrc` or by starting a new terminal session.
+    python3 -m pip install --upgrade pip
 
-Alternatively, you can answer `no` to the above question and activate conda whenever you need it:
+## Installing xARPES
 
-	eval "$(<your_path>/miniconda3/bin/conda shell.<your_shell> hook)"
+### Option A — User installation (from PyPI)
 
-Next, we install `conda-build` for developing xARPES (answer `y` to questions):
+This installs the latest stable release:
 
-	conda install conda-build
+    python3 -m pip install xarpes
 
-Finally, the following steps are executed for the installation &ndash; the `<my_env>` environment will have to be launched whenever running xARPES:
+### Option B — Developer installation (editable install from GitHub)
 
-	git clone git@github.com:xARPES/xARPES.git
-	cd xARPES
-	conda create -n <my_env> -c defaults -c conda-forge
-	conda activate <my_env>
-        pip install -e .
+This installs the development version and allows live editing:
 
-Answer `y` to questions.
+    git clone git@github.com:xARPES/xARPES.git
+    cd xARPES
+    python3 -m pip install -e .
+
+---
+
+# Conda installation
+
+The following steps describe how to install xARPES within a conda environment.  
+These instructions apply to both user installation (from conda-forge) and developer installation (from GitHub).
+
+## Setting up the environment
+
+Download the installer appropriate for your system from:
+
+    https://docs.anaconda.com/free/miniconda/
+
+Example for Linux:
+
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash Miniconda3-latest-Linux-x86_64.sh
+
+When prompted:
+
+- Press Enter to scroll through the license.
+- Answer `yes` to *accept license terms*.
+- Choose your installation location.
+- Optionally answer `yes` to:
+
+        You can undo this by running `conda init --reverse $SHELL`? [yes|no]
+
+If you said `yes`, the base environment is activated automatically in new shells.  
+Otherwise, activate conda manually:
+
+    eval "$(<your_path>/miniconda3/bin/conda shell.<your_shell> hook)"
+
+For development workflows, install `conda-build` (optional but recommended):
+
+    conda install conda-build
+
+Create a fresh environment named `<my_env>`:
+
+    conda create -n <my_env> -c defaults -c conda-forge
+    conda activate <my_env>
+
+## Installing xARPES
+
+### Option A — User installation (from conda-forge)
+
+This installs the latest stable release:
+
+    conda install conda-forge::xarpes
+
+### Option B — Developer installation (editable install from GitHub)
+
+This installs the development version and allows live editing:
+
+    git clone git@github.com:xARPES/xARPES.git
+    cd xARPES
+    pip install -e .
 
 # Examples
 
@@ -95,6 +162,10 @@ Equivalently:
 It is recommended to use JupyterLab to analyse data. JupyterLab is launched using:
 
 	jupyter lab
+
+# Citation
+
+If you have used xARPES for your research, please cite the following preprint: https://arxiv.org/abs/2508.13845.
 
 # License
 
