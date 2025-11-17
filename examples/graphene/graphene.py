@@ -172,12 +172,6 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
 
 
-
-
-
-
-
-
 # fig = plt.figure(figsize=(8, 5))
 # ax = fig.gca()
 
@@ -264,8 +258,6 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 # line2.plot(angle_range=new_range, angle_resolution=0.1, ax=ax, show=False,
 #            fig_close=False)
 # fig = mdc.plot(ax=ax)
-
-
 
 
 # angle_min = 0.1

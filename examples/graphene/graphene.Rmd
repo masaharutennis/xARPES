@@ -226,18 +226,6 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 ```
 
 ```{python}
-
-```
-
-```{python}
-
-```
-
-```{python}
-
-```
-
-```{python}
 # # %matplotlib inline
 
 # fig = plt.figure(figsize=(8, 5))
@@ -343,8 +331,6 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 ```
 
 ```{python}
-
-
 # # %matplotlib inline
 
 # angle_min = 0.1

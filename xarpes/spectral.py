@@ -297,9 +297,24 @@ class BandMap:
 
 
     @add_fig_kwargs
-    def plot(self, abscissa='momentum', ordinate='electron_energy', ax=None,
-            **kwargs):
-        
+    def plot(self, abscissa='momentum', ordinate='electron_energy',
+            self_energies=None, ax=None, **kwargs):
+        r"""
+        Plot the band map. Optionally attach a collection of self-energies,
+        e.g. a CreateSelfEnergies instance or any iterable of self-energy
+        objects. They are stored on `self` for later overlay plotting.
+        """
+
+        # Optionally store self-energies on the instance
+        if self_energies is not None:
+            # You can wrap here if you like, e.g.:
+            # from .containers import CreateSelfEnergies
+            # if not isinstance(self_energies, CreateSelfEnergies):
+            #     self_energies = CreateSelfEnergies(self_energies)
+            self._self_energies = self_energies
+        elif not hasattr(self, "_self_energies"):
+            self._self_energies = None
+
         # Validate options early
         valid_abscissa = ('angle', 'momentum')
         valid_ordinate = ('kinetic_energy', 'electron_energy')
@@ -1768,7 +1783,8 @@ class SelfEnergy:
                 if self._side is None:
                     raise AttributeError(
                         "For SpectralQuadratic, set `side` ('left'/'right') "
-                        "before accessing peak_positions."
+                        "before accessing peak_positions and quantities that "
+                        "depend on the latter."
                     )
                 kpar_mag = np.sqrt(self._ekin_range / pref) * \
                     np.sin(np.abs(self._peak) * dtor)
@@ -1872,3 +1888,81 @@ class SelfEnergy:
                 self._real_sigma = 2 * pref * self.peak_positions_sigma \
                     * np.abs(self.peak_positions / self._bare_mass)
         return self._real_sigma
+
+
+class CreateSelfEnergies:
+    r"""
+    Thin container for self-energies with leaf-aware utilities.
+    All items are assumed to be leaf self-energy objects with
+    a `.label` attribute for identification.
+    """
+
+    def __init__(self, self_energies):
+        self.self_energies = self_energies
+
+    # ------ Basic container protocol ------
+    def __call__(self):
+        return self.self_energies
+
+    @property
+    def self_energies(self):
+        return self._self_energies
+
+    @self_energies.setter
+    def self_energies(self, x):
+        self._self_energies = x
+
+    def __iter__(self):
+        return iter(self.self_energies)
+
+    def __getitem__(self, index):
+        return self.self_energies[index]
+
+    def __setitem__(self, index, value):
+        self.self_energies[index] = value
+
+    def __len__(self):
+        return len(self.self_energies)
+
+    def __deepcopy__(self, memo):
+        import copy
+        return type(self)(copy.deepcopy(self.self_energies, memo))
+
+    # ------ Label-based utilities ------
+    def get_by_label(self, label):
+        r"""
+        Return the self-energy object with the given label.
+
+        Parameters
+        ----------
+        label : str
+            Label of the self-energy to retrieve.
+
+        Returns
+        -------
+        obj : SelfEnergy
+            The corresponding self-energy instance.
+
+        Raises
+        ------
+        KeyError
+            If no self-energy with the given label exists.
+        """
+        for se in self.self_energies:
+            if getattr(se, "label", None) == label:
+                return se
+        raise KeyError(
+            f"No self-energy with label {label!r} found in container."
+        )
+
+    def labels(self):
+        r"""
+        Return a list of all labels.
+        """
+        return [getattr(se, "label", None) for se in self.self_energies]
+
+    def as_dict(self):
+        r"""
+        Return a {label: self_energy} dictionary for convenient access.
+        """
+        return {se.label: se for se in self.self_energies}

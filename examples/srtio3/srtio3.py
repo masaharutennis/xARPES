@@ -83,6 +83,12 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
 # fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
 #                          matrix_args=mat_args, ax=ax)
 
+# ##### Notes for quadratic bands
+# - The user has to explicitly assign the peaks as left-hand or right-hand side.  
+# - In theory, one could incorporate such information in a minus sign of the peak position.  
+# - However, this would also require setting boundaries for the fitting range.  
+# - Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
+
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', 
                                 bare_mass=0.6, fermi_wavevector=0.142, side='right'))
 
@@ -91,16 +97,28 @@ self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2'
 
 self_two.side='right'
 
+self_energies = xarpes.CreateSelfEnergies([self_energy, self_two])
+
+
+fig = plt.figure(figsize=(8, 5))
+ax = fig.gca()
+
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', self_energies=self_energies, ax=ax)
+
+
+
+
+
 fig = plt.figure(figsize=(7, 5))
 ax = fig.gca()
 
 from xarpes.constants import stdv
 
-ax.errorbar(self_energy.enel_range, self_energy.imag, 
+ax.errorbar(self_energy.enel_range, self_energy.imag,
             yerr=stdv * self_energy.imag_sigma, label =r"$-\Sigma''_{\rm{IR}}(E)$")
-ax.errorbar(self_energy.enel_range, self_two.imag, 
+ax.errorbar(self_energy.enel_range, self_two.imag,
             yerr=stdv * self_two.imag_sigma, label =r"$-\Sigma''_{\rm{OR}}(E)$")
-ax.errorbar(self_energy.enel_range, self_energy.real, 
+ax.errorbar(self_energy.enel_range, self_energy.real,
             yerr=stdv * self_energy.real_sigma, label =r"$\Sigma'_{\rm{IR}}(E)$")
 ax.errorbar(self_energy.enel_range, self_two.real,
             yerr=stdv * self_two.real_sigma, label =r"$\Sigma'_{\rm{OR}}(E)$")
@@ -235,238 +253,225 @@ plt.show()
 #     ax=ax)
 
 
-angle_min = 0.0
-angle_max = 5.0
-en_val = 0.0
+# angle_min = 0.0
+# angle_max = 5.0
+# en_val = 0.0
 
-mdc = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
+# mdc = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_value=en_val))
 
-fig = plt.figure(figsize=(6, 5))
-ax = fig.gca()
+# fig = plt.figure(figsize=(6, 5))
+# ax = fig.gca()
 
-fig = mdc.plot(ax=ax)
-
-
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-from xarpes.constants import dtor
-
-k_0 = -0.0014
-theta_0 = 0
-
-guess_dists = xarpes.CreateDistributions([
-xarpes.Constant(offset=600),
-
-xarpes.SpectralLinear(amplitude=3000, peak=2.4, broadening=0.0001,
-                      name='Faint_band', index='1'),
-
-xarpes.SpectralQuadratic(amplitude=3800, peak=2.45, broadening=0.00024,
-            center_wavevector=k_0, name='Inner_band', index='2'),
-
-xarpes.SpectralQuadratic(amplitude=1800, peak=3.6, broadening=0.0004,
-            center_wavevector=k_0, name='Outer_band', index='3')
-])
-
-import numpy as np
-mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
-
-# mat_el = lambda x, theta_0: np.sin((x - theta_0) * dtor) ** 2
-
-mat_args = {
-#  'theta_0' : 0.0
-}
-
-fig = mdc.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
-                           ax=ax, matrix_args=mat_args, show=True)
+# fig = mdc.plot(ax=ax)
 
 
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# from xarpes.constants import dtor
 
-fig = mdcs.fit_selection(distributions=new_dists, matrix_element=mat_el, 
-                         matrix_args=mat_args, ax=ax)
+# k_0 = -0.0014
+# theta_0 = 0
+
+# guess_dists = xarpes.CreateDistributions([
+# xarpes.Constant(offset=600),
+
+# xarpes.SpectralLinear(amplitude=3000, peak=2.4, broadening=0.0001,
+#                       name='Faint_band', index='1'),
+
+# xarpes.SpectralQuadratic(amplitude=3800, peak=2.45, broadening=0.00024,
+#             center_wavevector=k_0, name='Inner_band', index='2'),
+
+# xarpes.SpectralQuadratic(amplitude=1800, peak=3.6, broadening=0.0004,
+#             center_wavevector=k_0, name='Outer_band', index='3')
+# ])
+
+# import numpy as np
+# mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
+
+# # mat_el = lambda x, theta_0: np.sin((x - theta_0) * dtor) ** 2
+
+# mat_args = {
+# #  'theta_0' : 0.0
+# }
+
+# fig = mdc.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
+#                            ax=ax, matrix_args=mat_args, show=True)
+
+
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
 # fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
 #                          matrix_args=mat_args, ax=ax)
 
+# # fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
+# #                          matrix_args=mat_args, ax=ax)
 
 
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-fig, new_dists, covariance_matrix, new_mat_args = mdc.fit(
-    distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
-    ax=ax)
-
-
-energy_range = [-0.1, 0.01]
-
-angle_min = 0.0
-angle_max = 4.8
-
-mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
-
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-fig = mdcs.plot(angle_range=mdcs.angles, angle_resolution=0.2, ax=ax)
+# fig, new_dists, covariance_matrix, new_mat_args = mdc.fit(
+#     distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
+#     ax=ax)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# energy_range = [-0.1, 0.01]
 
-fig, new_dists, covariance_matrix, new_mat_args = mdcs.fit(
-    distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
-    energy_value=0, ax=ax)
+# angle_min = 0.0
+# angle_max = 4.8
 
+# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
-guess_dists = xarpes.CreateDistributions([
-xarpes.Constant(offset=600),
-xarpes.SpectralQuadratic(amplitude=3800, peak=-2.45, broadening=0.00024,
-            center_wavevector=k_0, name='Inner_band', index='1'),
-xarpes.SpectralQuadratic(amplitude=1800, peak=-3.6, broadening=0.0004,
-            center_wavevector=k_0, name='Outer_band', index='2')
-])
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-import numpy as np
-
-mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
-
-mat_args = {}
-
-energy_range = [-0.1, 0.003]
-angle_min = 0.0
-angle_max = 4.8
-
-mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
-
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
-                           matrix_args=mat_args, energy_value=-0.000, ax=ax)
+# fig = mdcs.plot(angle_range=mdcs.angles, angle_resolution=0.2, ax=ax)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-fig, new_dists, cov_mat, new_mat_args = mdcs.fit(distributions=guess_dists, 
-    matrix_element=mat_el, matrix_args=mat_args, energy_value=0.0, ax=ax)
+# fig, new_dists, covariance_matrix, new_mat_args = mdcs.fit(
+#     distributions=guess_dists, matrix_element=mat_el, matrix_args=mat_args,
+#     energy_value=0, ax=ax)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# guess_dists = xarpes.CreateDistributions([
+# xarpes.Constant(offset=600),
+# xarpes.SpectralQuadratic(amplitude=3800, peak=-2.45, broadening=0.00024,
+#             center_wavevector=k_0, name='Inner_band', index='1'),
+# xarpes.SpectralQuadratic(amplitude=1800, peak=-3.6, broadening=0.0004,
+#             center_wavevector=k_0, name='Outer_band', index='2')
+# ])
 
-fig = mdcs.fit_selection(distributions=new_dists, matrix_element=mat_el, 
-                         matrix_args=mat_args, ax=ax)
+# import numpy as np
 
-# fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
+# mat_el = lambda x: np.sin((x - theta_0) * dtor) ** 2
+
+# mat_args = {}
+
+# energy_range = [-0.1, 0.003]
+# angle_min = 0.0
+# angle_max = 4.8
+
+# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
+
+# fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
+#                            matrix_args=mat_args, energy_value=-0.000, ax=ax)
+
+
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
+
+# fig, new_dists, cov_mat, new_mat_args = mdcs.fit(distributions=guess_dists, 
+#     matrix_element=mat_el, matrix_args=mat_args, energy_value=0.0, ax=ax)
+
+
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
+
+# fig = mdcs.fit_selection(distributions=new_dists, matrix_element=mat_el, 
 #                          matrix_args=mat_args, ax=ax)
 
+# # fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
+# #                          matrix_args=mat_args, ax=ax)
+
+# self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', side='right'))
+
+# self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2'))
+
+# self_two.side='right'
 
 
-# ##### Notes for quadratic bands
-# - The user has to explicitly assign the peaks as left-hand or right-hand side.  
-# - In theory, one could incorporate such information in a minus sign of the peak position.  
-# - However, this would also require setting boundaries for the fitting range.  
-# - Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
+# fig = plt.figure(figsize=(10, 7))
+# ax = fig.gca()
 
-self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', side='right'))
+# from xarpes.constants import stdv
 
-self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2'))
+# ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
+#             xerr=stdv * self_energy.peak_positions_sigma,
+#            markersize=2, color='tab:blue', label=self_energy.label)
+# ax.errorbar(self_two.peak_positions, self_two.enel_range, 
+#             xerr=stdv * self_two.peak_positions_sigma,
+#            markersize=2, color='tab:purple', label=self_two.label)
 
-self_two.side='right'
+# ax.set_xlim([-0.25, 0.25])
+# ax.set_ylim([-0.3, 0.1])
 
+# plt.legend()
+# fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
-fig = plt.figure(figsize=(10, 7))
-ax = fig.gca()
-
-from xarpes.constants import stdv
-
-ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-ax.errorbar(self_two.peak_positions, self_two.enel_range, 
-            xerr=stdv * self_two.peak_positions_sigma,
-           markersize=2, color='tab:purple', label=self_two.label)
-
-ax.set_xlim([-0.25, 0.25])
-ax.set_ylim([-0.3, 0.1])
-
-plt.legend()
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
-
-plt.show()
+# plt.show()
 
 
-guess_dists = xarpes.CreateDistributions([
-xarpes.Constant(offset=600),
+# guess_dists = xarpes.CreateDistributions([
+# xarpes.Constant(offset=600),
 
-xarpes.SpectralQuadratic(amplitude=8, peak=2.45, broadening=0.00024,
-            center_wavevector=k_0, name='Inner_nm', index='1'),
+# xarpes.SpectralQuadratic(amplitude=8, peak=2.45, broadening=0.00024,
+#             center_wavevector=k_0, name='Inner_nm', index='1'),
 
-xarpes.SpectralQuadratic(amplitude=8, peak=3.6, broadening=0.0004,
-            center_wavevector=k_0, name='Outer_nm', index='2')
-])
+# xarpes.SpectralQuadratic(amplitude=8, peak=3.6, broadening=0.0004,
+#             center_wavevector=k_0, name='Outer_nm', index='2')
+# ])
 
-energy_range = [-0.1, 0.003]
-angle_min=0.0
-angle_max=5.0
+# energy_range = [-0.1, 0.003]
+# angle_min=0.0
+# angle_max=5.0
 
-mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+# mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, energy_value=0)
-
-
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
-
-fig, new_dists, cov_mat = mdcs.fit(distributions=guess_dists, energy_value=0, ax=ax)
+# fig = mdcs.visualize_guess(distributions=guess_dists, ax=ax, energy_value=0)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-fig = mdcs.fit_selection(distributions=new_dists, ax=ax)
-
-self_three = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_nm_1', side='right',
-                                fermi_wavevector=10))
-
-self_four = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_nm_2', side='right',
-                                fermi_wavevector=10))
+# fig, new_dists, cov_mat = mdcs.fit(distributions=guess_dists, energy_value=0, ax=ax)
 
 
-fig = plt.figure(figsize=(10, 7))
-ax = fig.gca()
+# fig = plt.figure(figsize=(7, 5))
+# ax = fig.gca()
 
-from xarpes.constants import stdv
+# fig = mdcs.fit_selection(distributions=new_dists, ax=ax)
 
-ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-ax.errorbar(self_two.peak_positions, self_two.enel_range, 
-            xerr=stdv * self_two.peak_positions_sigma,
-           markersize=2, color='tab:purple', label=self_two.label)
-ax.errorbar(self_three.peak_positions, self_three.enel_range, 
-            xerr=stdv * self_three.peak_positions_sigma,
-            markersize=2, color='tab:brown', label=self_three.label)
-ax.errorbar(self_four.peak_positions, self_four.enel_range, 
-            xerr=stdv * self_four.peak_positions_sigma, 
-            markersize=2, color='palevioletred', label=self_four.label)
+# self_three = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_nm_1', side='right',
+#                                 fermi_wavevector=10))
 
-ax.set_xlim([0, 0.25]); ax.set_ylim([-0.15, 0.05])
-
-plt.legend()
-
-# Put <1 zorder such that scatters aren't overrridden
-bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, zorder=0.5)
-
-plt.show()
+# self_four = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_nm_2', side='right',
+#                                 fermi_wavevector=10))
 
 
+# fig = plt.figure(figsize=(10, 7))
+# ax = fig.gca()
+
+# from xarpes.constants import stdv
+
+# ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
+#             xerr=stdv * self_energy.peak_positions_sigma,
+#            markersize=2, color='tab:blue', label=self_energy.label)
+# ax.errorbar(self_two.peak_positions, self_two.enel_range, 
+#             xerr=stdv * self_two.peak_positions_sigma,
+#            markersize=2, color='tab:purple', label=self_two.label)
+# ax.errorbar(self_three.peak_positions, self_three.enel_range, 
+#             xerr=stdv * self_three.peak_positions_sigma,
+#             markersize=2, color='tab:brown', label=self_three.label)
+# ax.errorbar(self_four.peak_positions, self_four.enel_range, 
+#             xerr=stdv * self_four.peak_positions_sigma, 
+#             markersize=2, color='palevioletred', label=self_four.label)
+
+# ax.set_xlim([0, 0.25]); ax.set_ylim([-0.15, 0.05])
+
+# plt.legend()
+
+# # Put <1 zorder such that scatters aren't overrridden
+# bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, zorder=0.5)
+
+# plt.show()
