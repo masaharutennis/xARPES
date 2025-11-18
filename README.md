@@ -6,18 +6,18 @@ Repository for the code xARPES &ndash; extraction of the self-energy and Eliashb
 
 # Warning
 
-This project is currently undergoing **beta testing**. Some functionalities from the accompanying preprint (https://arxiv.org/abs/2508.13845) are still missing. If you encounter any bugs, you can open an issue.
+This project is currently undergoing **beta testing**. Some of the functionalities are in the process of being implemented. If you encounter any bugs, you can open an issue.
 
 # Contributing
 
-Contributions to the code are most welcome. xARPES is intended to co-develop alongside the increasing complexity of experimental ARPES data sets. Contributions can be made by forking the code and creating a pull request. Importing of file formats from different beamlines is particularly encouraged. The code is maintained on GitHub: https://github.com/xARPES/xARPES.
+Contributions to the code are most welcome. xARPES is intended to co-develop alongside the increasing complexity of experimental ARPES data sets. Contributions can be made by forking the code and creating a pull request. Importing of file formats from different beamlines is particularly encouraged.
 
 # Installation
 
 xARPES can be installed in several ways depending on your workflow:  
 - via a graphical package manager (Anaconda Navigator, VS Code, PyCharm, Spyder, JupyterLab)  
-- via Conda Forge, out-of-the-box or editable installation, sourcing https://anaconda.org/conda-forge/xarpes.
-- via Pip, out-of-the-box or editable installation, sourcing https://https://pypi.org/project/xarpes.
+- via conda-forge, out-of-the-box or editable installation, sourcing https://anaconda.org/conda-forge/xarpes.
+- via Pip, out-of-the-box or editable installation, sourcing https://pypi.org/project/xarpes.
 
 ## Graphical package manager installation
 
@@ -42,7 +42,7 @@ These IDEs install from the active environment’s package source:
 
 ### Installation steps (generic)
 
-1. Open your IDE  
+1. Open your IDE
 2. Select or create a Python environment  
 3. Open the environment/package manager panel  
 4. Search for “xarpes”  
@@ -56,59 +56,64 @@ Install xARPES inside a conda environment, either out of the box or as an editab
 
 Download and install Miniconda (see https://docs.anaconda.com/free/miniconda/).
 
-Example for Linux:  
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  
-bash Miniconda3-latest-Linux-x86_64.sh
+Example for Linux:
 
-Create and activate an environment:  
-conda create -n <my_env> -c defaults -c conda-forge  
-conda activate <my_env>
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  
+    bash Miniconda3-latest-Linux-x86_64.sh
+
+Create and activate an environment:
+
+    conda create -n <my_env> -c defaults -c conda-forge  
+    conda activate <my_env>
 
 ### Installing xARPES
 
 #### Option A — User installation (from conda-forge)
 
-conda install conda-forge::xarpes
+    conda install conda-forge::xarpes
 
 #### Option B — Developer installation (GitHub, editable)
 
-git clone git@github.com:xARPES/xARPES.git  
-cd xARPES  
-pip install -e .
+    git clone git@github.com:xARPES/xARPES.git  
+    cd xARPES  
+    pip install -e .
 
 ## Pip installation
 
-Install xARPES using pip, either out of the box or as an editable.
+    Install xARPES using pip, either out of the box or as an editable.
 
 ### Setting up a virtual environment
 
-Install venv if necessary:  
-sudo apt install python3-venv
+Install venv if necessary:
 
-Create and activate a virtual environment:  
-python3 -m venv <my_venv>  
-source <my_venv>/bin/activate
+    sudo apt install python3-venv
 
-Upgrade pip:  
-python3 -m pip install --upgrade pip
+Create and activate a virtual environment:
+
+    python3 -m venv <my_venv>  
+    source <my_venv>/bin/activate
+
+Upgrade pip:
+
+    python3 -m pip install --upgrade pip
 
 ### Installing xARPES
 
 #### Option A — User installation (PyPI)
 
-python3 -m pip install xarpes
+    python3 -m pip install xarpes
 
 #### Option B — Developer installation (GitHub, editable)
 
-git clone git@github.com:xARPES/xARPES.git  
-cd xARPES  
-python3 -m pip install -e .
+    git clone git@github.com:xARPES/xARPES.git  
+    cd xARPES  
+    python3 -m pip install -e .
 
 # Examples
 
 After installation of xARPES, the `examples/` folder can be downloaded to the current directory:
 
-	xarpes_download_examples
+    xarpes_download_examples
 
 Equivalently:
 
