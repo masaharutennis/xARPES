@@ -2,7 +2,11 @@
 
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import xarpes
+try:
+    import xarpes
+    version = release = xarpes.__version__
+except Exception:
+    version = release = "0.1.0"
 
 project = 'xARPES'
 copyright = '2025 xARPES Developers'

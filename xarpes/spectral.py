@@ -19,7 +19,54 @@ from .distributions import FermiDirac, Linear
 from .constants import uncr, pref, dtor, kilo
 
 class BandMap:
-    r"""Class for the band map from the ARPES experiment."""
+    r"""
+    Class for the band map from the ARPES experiment.
+
+    Parameters
+    ----------
+    datafile : str, optional
+        Path to an IGOR binary wave file.
+    intensities : ndarray, optional
+        2D array of intensities [E, angle].
+    angles : ndarray, optional
+        1D array of emission angles in degrees.
+    ekin : ndarray, optional
+        1D array of kinetic energies in eV.
+    enel : ndarray, optional
+        1D array of electron energies in eV.
+    energy_resolution : float, optional
+        Energy-resolution standard deviation [eV].
+    angle_resolution : float, optional
+        Angular-resolution standard deviation [deg].
+    temperature : float, optional
+        Sample temperature [K].
+    hnuminphi : float, optional
+        Photon energy minus work function [eV].
+    hnuminphi_std : float, optional
+        Standard deviation on ``hnuminphi`` [eV].
+    transpose : bool, optional
+        If True, transpose the input data.
+    flip_ekin : bool, optional
+        If True, flip the energy axis.
+    flip_angles : bool, optional
+        If True, flip the angle axis.
+
+    Attributes
+    ----------
+    intensities : ndarray
+        2D intensity map [energy, angle].
+    angles : ndarray
+        Emission angles in degrees.
+    ekin : ndarray
+        Kinetic-energy axis in eV.
+    enel : ndarray
+        Electron-energy axis in eV.
+    hnuminphi : float or None
+        Photon energy minus work function.
+    hnuminphi_std : float or None
+        Standard deviation on ``hnuminphi``.
+
+    """
 
     def __init__(self, datafile=None, intensities=None, angles=None,
                  ekin=None, enel=None, energy_resolution=None,
@@ -195,6 +242,7 @@ class BandMap:
         -------
         hnuminphi : float, None
             Kinetic energy minus the work function [eV]
+
         """
         return self._hnuminphi
 
@@ -220,6 +268,7 @@ class BandMap:
         -------
         hnuminphi_std : float
             Standard deviation of energy minus the work function [eV]
+            
         """
         return self._hnuminphi_std
 
@@ -232,6 +281,7 @@ class BandMap:
         ----------
         hnuminphi_std : float
             Standard deviation of energy minus the work function [eV]
+
         """
         self._hnuminphi_std = x
 
@@ -244,9 +294,9 @@ class BandMap:
         ----------
         shift : float
             Angular shift [degrees]
+
         """
         self.angles = self.angles + shift
-        
         
     def mdc_set(self, angle_min, angle_max, energy_value=None,
                 energy_range=None):
@@ -265,8 +315,9 @@ class BandMap:
             Array of size n containing the angular values
         energy_range : ndarray
             Array of size m containing the energy values
-        mdcs :
+        mdcs : ndarray
             Array of size n x m containing the MDC intensities
+
         """
 
         if (energy_value is None and energy_range is None) or \
@@ -420,6 +471,7 @@ class BandMap:
         -------
         fig : Matplotlib-Figure
             Figure containing the Fermi edge fit
+
         """
         from scipy.ndimage import gaussian_filter
 
@@ -495,6 +547,8 @@ class BandMap:
 
         Parameters
         ----------
+        hnuminphi_guess : float, optional
+            Initial guess for kinetic energy minus the work function [eV].
 
         Other parameters
         ----------------
@@ -505,6 +559,7 @@ class BandMap:
         -------
         fig : Matplotlib-Figure
             Figure containing the Fermi edge fit
+
         """
         from scipy.ndimage import map_coordinates
         
@@ -595,30 +650,72 @@ class BandMap:
                                   
         return fig
 
-    
+
 class MDCs:
     r"""
-    Momentum Distribution Curves (MDC) container for fitted ARPES data.
+    Container for momentum distribution curves (MDCs) and their fits.
 
-    Holds the raw intensity maps, angular and energy grids, and the
-    post-fit aggregated parameters produced by `.fit_selection()`.
+    This class stores the MDC intensity maps, angular and energy grids, and
+    the aggregated fit results produced by :meth:`fit_selection`.
+
+    Parameters
+    ----------
+    intensities : ndarray
+        MDC intensity data. Typically a 2D array with shape
+        ``(n_energy, n_angle)`` or a 1D array for a single curve.
+    angles : ndarray
+        Angular grid corresponding to the MDCs [degrees].
+    angle_resolution : float
+        Angular step size or effective angular resolution [degrees].
+    enel : ndarray or float
+        Electron binding energies of the MDC slices [eV].
+        Can be a scalar for a single MDC.
+    hnuminphi : float
+        Photon energy minus work function, used to convert ``enel`` to
+        kinetic energy [eV].
+
+    Attributes
+    ----------
+    intensities : ndarray
+        MDC intensity data (same object as passed to the constructor).
+    angles : ndarray
+        Angular grid [degrees].
+    angle_resolution : float
+        Angular step size or resolution [degrees].
+    enel : ndarray or float
+        Electron binding energies [eV], as given at construction.
+    ekin : ndarray or float
+        Kinetic energies [eV], computed as ``enel + hnuminphi``.
+    hnuminphi : float
+        Photon energy minus work function [eV].
+    ekin_range : ndarray
+        Kinetic-energy values of the slices that were actually fitted.
+        Set by :meth:`fit_selection`.
+    individual_properties : dict
+        Nested mapping of fitted parameters and their uncertainties for each
+        component and each energy slice. Populated by :meth:`fit_selection`.
 
     Notes
     -----
-    After calling `.fit_selection()`, `individual_properties` is a nested dict:
+    After calling :meth:`fit_selection`, :attr:`individual_properties` has the
+    structure::
+
         {
-            <label>: {
-                <class_name>: {
-                    'label': <label>,
-                    '_class': <class_name>,
-                    <param>: [values per slice],
-                    <param>_sigma: [1σ per slice or None],
+            label: {
+                class_name: {
+                    'label': label,
+                    '_class': class_name,
+                    param:       [values per energy slice],
+                    param_sigma: [1σ per slice or None],
                     ...
                 }
             }
         }
-    where `<param>` ∈ {'offset','slope','amplitude','peak','broadening', ...}
-    and `<param>_sigma` is the uncertainty aligned 1:1 with `<param>`.
+
+    where ``param`` is typically one of ``'offset'``, ``'slope'``,
+    ``'amplitude'``, ``'peak'``, ``'broadening'``, and ``param_sigma`` stores
+    the corresponding uncertainty for each slice.
+    
     """
 
     def __init__(self, intensities, angles, angle_resolution, enel, hnuminphi):
@@ -700,18 +797,19 @@ class MDCs:
         Returns
         -------
         dict
-            Nested mapping:
-            {
-                label: {
-                    class_name: {
-                        'label': label,
-                        '_class': class_name,
-                        <param>:        [values per slice],
-                        <param>_sigma:  [1σ per slice or None],
-                        ...
+            Nested mapping::
+
+                {
+                    label: {
+                        class_name: {
+                            'label': label,
+                            '_class': class_name,
+                            <param>:        [values per slice],
+                            <param>_sigma:  [1σ per slice or None],
+                            ...
+                        }
                     }
                 }
-            }
         """
         if self._individual_properties is None:
             raise AttributeError(
@@ -1966,3 +2064,4 @@ class CreateSelfEnergies:
         Return a {label: self_energy} dictionary for convenient access.
         """
         return {se.label: se for se in self.self_energies}
+    

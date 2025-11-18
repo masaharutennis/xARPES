@@ -10,7 +10,8 @@ Dependencies:
     pip install jupytext
 
 Usage:
-    python Rmd2py.py   (run from anywhere; it operates relative to this file's directory)
+    Place Rmd2py.py in the /examples directory, where it is .gitignored.
+    $ python Rmd2py.py # run from anywhere; it operates where it exists.
 """
 
 import os
