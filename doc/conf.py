@@ -13,7 +13,7 @@ copyright = '2025 xARPES Developers'
 
 # --- HTML logo + static files ---
 html_static_path = ["_static"]
-html_logo = "_static/xarpes.svg"
+html_logo = "_static/xarpes_small.svg"
 html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'logo_only': True,
