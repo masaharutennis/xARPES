@@ -113,11 +113,7 @@ Upgrade pip:
 
 After installation of xARPES, the `examples/` folder can be downloaded to the current directory:
 
-    xarpes_download_examples
-
-Equivalently:
-
-    python3 -c "import xarpes; xarpes.download_examples()"
+    python -c "import xarpes; xarpes.download_examples()"
 
 # Execution
 
