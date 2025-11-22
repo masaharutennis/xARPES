@@ -14,7 +14,7 @@ Contributions to the code are most welcome. xARPES is intended to co-develop alo
 
 # Installation
 
-xARPES can be installed in several ways depending on your workflow:  
+xARPES installation can be divided into graphical package manager instructions, and command-line instructions for either conda or pip. With command-line instructions, an editable installation of xARPES can be created; on Windows, we strongly recommend Windows Powershell to do so. Here is a summary for the three options:
 - via a graphical package manager (Anaconda Navigator, VS Code, PyCharm, Spyder, JupyterLab)  
 - via conda-forge, out-of-the-box or editable installation, sourcing the [conda-forge package](https://anaconda.org/conda-forge/xarpes).  
 - via Pip, out-of-the-box or editable installation, sourcing the [PyPI package](https://pypi.org/project/xarpes).
@@ -68,14 +68,19 @@ Create and activate an environment:
 
 ### Installing xARPES
 
-#### Option A — User installation (from conda-forge)
+#### Option A — Out-of-the-box installation (from conda-forge)
 
     conda install conda-forge::xarpes
 
-#### Option B — Developer installation (GitHub, editable)
+#### Option B — Editable installation (GitHub)
+
+First, clone the repository:
 
     git clone git@github.com:xARPES/xARPES.git  
-    cd xARPES  
+    cd xARPES
+
+Then perform editable installation (this mixes conda and pip):
+
     pip install -e .
 
 ## Pip installation
@@ -99,15 +104,20 @@ Upgrade pip:
 
 ### Installing xARPES
 
-#### Option A — User installation (PyPI)
+#### Option A — Out-of-the-box installation (PyPI)
 
     python3 -m pip install xarpes
 
-#### Option B — Developer installation (GitHub, editable)
+#### Option B — Editable installation (GitHub)
+
+First, clone the repository:
 
     git clone git@github.com:xARPES/xARPES.git  
-    cd xARPES  
-    python3 -m pip install -e .
+    cd xARPES
+
+Then perform editable installation:
+
+    pip install -e .
 
 # Examples
 
