@@ -25,6 +25,7 @@ dependencies = [
     "lmfit",
     "pyqt5",
     "ipympl",
+    "ipykernel<6.32.0"
 ]
 
 [project.scripts]
