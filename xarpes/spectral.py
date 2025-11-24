@@ -1888,7 +1888,7 @@ class SelfEnergy:
                     np.sin(np.abs(self._peak) * dtor)
                 self._peak_positions = (-1.0 if self._side == "left" \
                                         else 1.0) * kpar_mag
-            else:  # SpectralLinear
+            else:
                 self._peak_positions = np.sqrt(self._ekin_range / pref) \
                 * np.sin(self._peak * dtor)
         return self._peak_positions
@@ -1900,7 +1900,7 @@ class SelfEnergy:
             if self._peak_sigma is None or self._ekin_range is None:
                 return None
             self._peak_positions_sigma = (np.sqrt(self._ekin_range / pref)
-                                          * np.cos(self._peak * dtor) 
+                                          * np.abs(np.cos(self._peak * dtor))
                                           * self._peak_sigma * dtor)
         return self._peak_positions_sigma
 
@@ -1914,9 +1914,9 @@ class SelfEnergy:
                 if self._fermi_velocity is None:
                     raise AttributeError("Cannot compute `imag` "
                     "(SpectralLinear): set `fermi_velocity` first.")
-                self._imag = self._fermi_velocity * np.sqrt(self._ekin_range \
+                self._imag = np.abs(self._fermi_velocity) * np.sqrt(self._ekin_range \
                      / pref) * self._broadening
-            else:  # SpectralQuadratic
+            else:
                 if self._bare_mass is None:
                     raise AttributeError("Cannot compute `imag` "
                     "(SpectralQuadratic): set `bare_mass` first.")
@@ -1934,7 +1934,7 @@ class SelfEnergy:
                 if self._fermi_velocity is None:
                     raise AttributeError("Cannot compute `imag_sigma` "
                     "(SpectralLinear): set `fermi_velocity` first.")
-                self._imag_sigma = self._fermi_velocity * \
+                self._imag_sigma = np.abs(self._fermi_velocity) * \
                     np.sqrt(self._ekin_range / pref) * self._broadening_sigma
             else:  # SpectralQuadratic
                 if self._bare_mass is None:
@@ -1957,13 +1957,13 @@ class SelfEnergy:
                     "`fermi_wavevector` first.")
                 self._real = self.enel_range - self._fermi_velocity * \
                     (self.peak_positions - self._fermi_wavevector)
-            else:  # SpectralQuadratic
+            else:
                 if self._bare_mass is None or self._fermi_wavevector is None:
                     raise AttributeError("Cannot compute `real` "
                     "(SpectralQuadratic): set `bare_mass` and " \
                     "`fermi_wavevector` first.")
                 self._real = self.enel_range - (pref / \
-                    np.abs(self._bare_mass)) * (self.peak_positions**2 \
+                    self._bare_mass) * (self.peak_positions**2 \
                     - self._fermi_wavevector**2)
         return self._real
 
@@ -1977,8 +1977,8 @@ class SelfEnergy:
                 if self._fermi_velocity is None:
                     raise AttributeError("Cannot compute `real_sigma` "
                     "(SpectralLinear): set `fermi_velocity` first.")
-                self._real_sigma = self._fermi_velocity * self.peak_positions_sigma
-            else:  # SpectralQuadratic
+                self._real_sigma = np.abs(self._fermi_velocity) * self.peak_positions_sigma
+            else: 
                 if self._bare_mass is None or self._fermi_wavevector is None:
                     raise AttributeError("Cannot compute `real_sigma` "
                     "(SpectralQuadratic): set `bare_mass` and " \
