@@ -282,7 +282,7 @@ def download_examples():
         # Path to the extracted main folder (e.g. xARPES-main)
         main_folder_path = os.path.join(
             output_dir,
-            repo_parts.split('/')[-1] + '-main'
+            zip_ref.namelist()[0]
         )
         examples_path = os.path.join(main_folder_path, 'examples')
 
