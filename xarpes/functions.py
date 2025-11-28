@@ -258,81 +258,81 @@ def download_examples():
     import tempfile
     import re
 
-    # importlib.metadata is stdlib from 3.8; use backport if on 3.7
-    try:
-        from importlib.metadata import version, PackageNotFoundError
-    except ImportError:  # Python 3.7 + backport
-        from importlib_metadata import version, PackageNotFoundError
-
-    # Main xARPES repo (examples now live in /examples here)
-    repo_url = 'https://github.com/xARPES/xARPES'
-    output_dir = '.'  # Directory from which the function is called
+    # Main xARPES repo (examples live under /examples there)
+    repo_url = "https://github.com/xARPES/xARPES"
+    output_dir = "."  # Directory from which the function is called
 
     # Target 'examples' directory in the user's current location
-    final_examples_path = os.path.join(output_dir, 'examples')
+    final_examples_path = os.path.join(output_dir, "examples")
     if os.path.exists(final_examples_path):
         print("Warning: 'examples' folder already exists. "
               "No download will be performed.")
         return 1  # Exit the function if 'examples' directory exists
 
-    # Determine a "clean" tag version, if possible
-    tag_version = None
+    # --- Determine version from xarpes.__init__.__version__ -----------------
     try:
-        raw_version = version("xarpes")
-        # Strip dev/local suffixes like '0.3.3+0.gHASH' or '0.3.3.dev2'
-        m = re.match(r'(\d+\.\d+\.\d+)', raw_version)
-        if m:
-            tag_version = m.group(1)
-        else:
-            tag_version = raw_version
-    except PackageNotFoundError:
-        # xarpes isn't installed as a distribution (very odd, but possible)
-        tag_version = None
+        # Import here (inside the function) to avoid circular imports at module
+        # import time.
+        import xarpes as _xarpes
+        raw_version = getattr(_xarpes, "__version__", None)
+    except Exception as exc:
+        print(f"Error: could not import xarpes to determine version: {exc}")
+        return 1
 
-    # Build list of refs to try: tagged release first, then main
-    repo_parts = repo_url.replace('https://github.com/', '').rstrip('/')
-    refs_to_try = []
-    if tag_version is not None:
-        refs_to_try.append(f'tags/v{tag_version}')
-    refs_to_try.append('heads/main')
+    if raw_version is None:
+        print("Error: xarpes.__version__ is not defined; cannot determine " \
+        "tag.")
+        return 1
 
-    response = None
-    for ref in refs_to_try:
-        zip_url = f'https://github.com/{repo_parts}/archive/refs/{ref}.zip'
+    raw_version = str(raw_version)
 
-        # Make the HTTP request to download the zip file
-        print(f'Downloading {zip_url}')
-        response = requests.get(zip_url)
-
-        if response.status_code == 200:
-            print(f"Successfully downloaded from ref '{ref}'.")
-            break
-        else:
-            print('Failed to download the repository. Status code: '
-                  f'{response.status_code}')
+    # Strip dev/local suffixes so that '0.3.3.dev1' or '0.3.3+0.gHASH'
+    # maps to the tag 'v0.3.3'. If you use plain '0.3.3' already, this is 
+    # a no-op.
+    m = re.match(r"(\d+\.\d+\.\d+)", raw_version)
+    if m:
+        tag_version = m.group(1)
     else:
-        # No ref worked
-        print("Error: could not download examples from any ref.")
+        # Fall back to the whole string if it doesn't match the simple 
+        # pattern.
+        tag_version = raw_version
+
+    print(f"Determined xARPES version from __init__: {raw_version} "
+          f"(using tag version '{tag_version}').")
+
+    # --- Download from the corresponding GitHub tag -------------------------
+    repo_parts = repo_url.replace("https://github.com/", "").rstrip("/")
+    ref = f"tags/v{tag_version}"
+    zip_url = f"https://github.com/{repo_parts}/archive/refs/{ref}.zip"
+
+    print(f"Downloading examples from tagged release at:\n  {zip_url}")
+    response = requests.get(zip_url)
+
+    if response.status_code != 200:
+        print("Error: failed to download the repository for tag "
+              f"'v{tag_version}'. HTTP status code: {response.status_code}")
         return 1
 
     zip_file_bytes = io.BytesIO(response.content)
 
-    # Use a temporary directory to avoid polluting the CWD
+    # --- Extract into a temporary directory to avoid polluting CWD ----------
     with tempfile.TemporaryDirectory() as tmpdir:
-        with zipfile.ZipFile(zip_file_bytes, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_bytes, "r") as zip_ref:
             zip_ref.extractall(tmpdir)
+            # First member gives us the top-level directory in the archive,
+            # typically something like 'xARPES-0.3.3/'.
             first_member = zip_ref.namelist()[0]
 
-        # Top-level directory inside the archive (e.g. 'xARPES-0.3.3/')
-        top_level_dir = first_member.split('/')[0]
+        top_level_dir = first_member.split("/")[0]
         main_folder_path = os.path.join(tmpdir, top_level_dir)
-        examples_path = os.path.join(main_folder_path, 'examples')
+        examples_path = os.path.join(main_folder_path, "examples")
 
-        # Move the 'examples' directory to the target location
         if not os.path.exists(examples_path):
-            print("Error: downloaded archive does not contain an 'examples' directory.")
+            print("Error: downloaded archive does not contain an " \
+            "'examples' directory.")
             return 1
 
+        # Move the 'examples' directory to the target location in the CWD
         shutil.move(examples_path, final_examples_path)
         print(f"'examples' subdirectory moved to {final_examples_path}")
 
@@ -340,17 +340,17 @@ def download_examples():
         # and delete the .Rmd files
         for dirpath, dirnames, filenames in os.walk(final_examples_path):
             for filename in filenames:
-                if filename.endswith('.Rmd'):
+                if filename.endswith(".Rmd"):
                     full_path = os.path.join(dirpath, filename)
                     jupytext.write(
                         jupytext.read(full_path),
-                        full_path.replace('.Rmd', '.ipynb')
+                        full_path.replace(".Rmd", ".ipynb")
                     )
                     os.remove(full_path)  # Deletes .Rmd file afterwards
-                    print(f'Converted and deleted {full_path}')
+                    print(f"Converted and deleted {full_path}")
 
     # Temporary directory is cleaned up automatically
-    print('Cleaned up temporary files.')
+    print("Cleaned up temporary files.")
     return 0
 
 
