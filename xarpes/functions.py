@@ -256,6 +256,13 @@ def download_examples():
     import io
     import jupytext
     import tempfile
+    import re
+
+    # importlib.metadata is stdlib from 3.8; use backport if on 3.7
+    try:
+        from importlib.metadata import version, PackageNotFoundError
+    except ImportError:  # Python 3.7 + backport
+        from importlib_metadata import version, PackageNotFoundError
 
     # Main xARPES repo (examples now live in /examples here)
     repo_url = 'https://github.com/xARPES/xARPES'
@@ -268,11 +275,29 @@ def download_examples():
               "No download will be performed.")
         return 1  # Exit the function if 'examples' directory exists
 
-    # Proceed with download if 'examples' directory does not exist
-    repo_parts = repo_url.replace('https://github.com/', '').rstrip('/')
+    # Determine a "clean" tag version, if possible
+    tag_version = None
+    try:
+        raw_version = version("xarpes")
+        # Strip dev/local suffixes like '0.3.3+0.gHASH' or '0.3.3.dev2'
+        m = re.match(r'(\d+\.\d+\.\d+)', raw_version)
+        if m:
+            tag_version = m.group(1)
+        else:
+            tag_version = raw_version
+    except PackageNotFoundError:
+        # xarpes isn't installed as a distribution (very odd, but possible)
+        tag_version = None
 
-    # Try matching tag first, then fall back to main
-    for ref in (f'tags/v{__version__}', 'heads/main'):
+    # Build list of refs to try: tagged release first, then main
+    repo_parts = repo_url.replace('https://github.com/', '').rstrip('/')
+    refs_to_try = []
+    if tag_version is not None:
+        refs_to_try.append(f'tags/v{tag_version}')
+    refs_to_try.append('heads/main')
+
+    response = None
+    for ref in refs_to_try:
         zip_url = f'https://github.com/{repo_parts}/archive/refs/{ref}.zip'
 
         # Make the HTTP request to download the zip file
@@ -280,12 +305,14 @@ def download_examples():
         response = requests.get(zip_url)
 
         if response.status_code == 200:
+            print(f"Successfully downloaded from ref '{ref}'.")
             break
         else:
             print('Failed to download the repository. Status code: '
                   f'{response.status_code}')
     else:
-        # Neither tag nor main could be downloaded
+        # No ref worked
+        print("Error: could not download examples from any ref.")
         return 1
 
     zip_file_bytes = io.BytesIO(response.content)
@@ -294,8 +321,9 @@ def download_examples():
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(zip_file_bytes, 'r') as zip_ref:
             zip_ref.extractall(tmpdir)
-            # Get the top-level directory inside the archive
             first_member = zip_ref.namelist()[0]
+
+        # Top-level directory inside the archive (e.g. 'xARPES-0.3.3/')
         top_level_dir = first_member.split('/')[0]
         main_folder_path = os.path.join(tmpdir, top_level_dir)
         examples_path = os.path.join(main_folder_path, 'examples')
@@ -321,6 +349,7 @@ def download_examples():
                     os.remove(full_path)  # Deletes .Rmd file afterwards
                     print(f'Converted and deleted {full_path}')
 
+    # Temporary directory is cleaned up automatically
     print('Cleaned up temporary files.')
     return 0
 
