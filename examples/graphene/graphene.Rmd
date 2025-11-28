@@ -129,14 +129,6 @@ fig = mdcs.visualize_guess(distributions=guess_dists, energy_value=energy_value,
 - As a fallback, the user may switch "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
 
 ```{python}
-import os, matplotlib, matplotlib.pyplot as plt
-
-print("MPLBACKEND:", os.environ.get("MPLBACKEND"))
-print("matplotlib backend:", matplotlib.get_backend())
-print("plt backend:", plt.get_backend())
-```
-
-```{python}
 # %matplotlib widget
 
 fig = plt.figure(figsize=(7, 5))
@@ -210,8 +202,7 @@ xarpes.SpectralLinear(amplitude=450, peak=-7.25, broadening=0.01,
                       name='Linear_left', index='1'),
 ])
 
-fig = plt.figure(figsize=(8, 6))
-ax = fig.gca()
+fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 
 fig = mdc2.visualize_guess(distributions=guess_dists2, energy_value=0, ax=ax)
 ```
@@ -221,11 +212,65 @@ fig = mdc2.visualize_guess(distributions=guess_dists2, energy_value=0, ax=ax)
 
 fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
 
-self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_1'))
+self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_1',
+fermi_velocity=-2.67, fermi_wavevector=-0.354))
 ```
 
 ```{python}
+import numpy as np
 
+from xarpes.constants import dtor, pref
+
+Angl, Ekin = np.meshgrid(bmap.angles, bmap.ekin)
+Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
+
+kmin, kmax = np.min(Mome), np.max(Mome)
+
+kspc = np.linspace(kmin, kmax, len(bmap.angles))
+
+dis1 = self_energy.fermi_velocity * (kspc - self_energy.fermi_wavevector)
+
+dis2 = self_left.fermi_velocity *(kspc - self_left.fermi_wavevector)
+```
+
+```{python}
+# ax.set_xlim([np.min(Mome), np.max(Mome)])
+# ax.set_ylim([np.min(Ekin - bmap.hnuminphi), np.max(Ekin - bmap.hnuminphi)])
+
+# %matplotlib inline
+
+fig = plt.figure(figsize=(8, 5))
+ax = fig.gca()
+
+self_energies= xarpes.CreateSelfEnergies([
+    self_energy, self_left])
+
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', self_energies=self_energies, 
+             ax=ax, markersize=1.5)
+```
+
+```{python}
+# %matplotlib inline
+
+fig = plt.figure(figsize=(8, 5))
+ax = fig.gca()
+
+from xarpes.constants import stdv
+
+ax.errorbar(self_left.mdc_maxima, self_left.enel_range, 
+            xerr=stdv * self_left.peak_positions_sigma,
+           markersize=2, color='tab:red', label=self_left.label)
+
+ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range, 
+            xerr=stdv * self_energy.peak_positions_sigma,
+           markersize=2, color='tab:blue', label=self_energy.label)
+
+ax.plot(kspc, dis1, linestyle='--'); ax.plot(kspc, dis2, linestyle='--')
+
+ax.set_xlim([np.min(Mome), np.max(Mome)])
+ax.set_ylim([np.min(Ekin - bmap.hnuminphi), np.max(Ekin - bmap.hnuminphi)])
+
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 ```
 
 ```{python}

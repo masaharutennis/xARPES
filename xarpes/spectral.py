@@ -16,7 +16,7 @@ from igor2 import binarywave
 from .plotting import get_ax_fig_plt, add_fig_kwargs
 from .functions import fit_leastsq, extend_function
 from .distributions import FermiDirac, Linear
-from .constants import uncr, pref, dtor, kilo
+from .constants import uncr, pref, dtor, kilo, stdv
 
 class BandMap:
     r"""
@@ -354,17 +354,10 @@ class BandMap:
         Plot the band map. Optionally attach a collection of self-energies,
         e.g. a CreateSelfEnergies instance or any iterable of self-energy
         objects. They are stored on `self` for later overlay plotting.
-        """
 
-        # Optionally store self-energies on the instance
-        if self_energies is not None:
-            # You can wrap here if you like, e.g.:
-            # from .containers import CreateSelfEnergies
-            # if not isinstance(self_energies, CreateSelfEnergies):
-            #     self_energies = CreateSelfEnergies(self_energies)
-            self._self_energies = self_energies
-        elif not hasattr(self, "_self_energies"):
-            self._self_energies = None
+        When self-energies are present and ``abscissa='momentum'``, their
+        MDC maxima are overlaid with 95 % confidence intervals.
+        """
 
         # Validate options early
         valid_abscissa = ('angle', 'momentum')
@@ -380,6 +373,33 @@ class BandMap:
                 f"Invalid ordinate '{ordinate}'. "
                 f"Valid options: {valid_ordinate}"
             )
+
+        # Extract optional marker-size override early (before any pcolormesh).
+        marker_kws = {}
+        for key in ("markersize", "ms"):
+            if key in kwargs:
+                marker_kws["markersize"] = kwargs.pop(key)
+                break
+
+        # Optionally store self-energies on the instance
+        if self_energies is not None:
+
+            # MDC maxima are defined in momentum space, not angle space
+            if abscissa == 'angle' and isinstance(
+                self_energies, (list, tuple, CreateSelfEnergies)
+            ):
+                raise ValueError(
+                    "MDC maxima cannot be plotted against angles; they are "
+                    "defined in momentum space. Use abscissa='momentum' when "
+                    "passing a list of self-energies."
+                )
+
+            if not isinstance(self_energies, CreateSelfEnergies):
+                self_energies = CreateSelfEnergies(self_energies)
+
+            self._self_energies = self_energies
+        elif not hasattr(self, "_self_energies"):
+            self._self_energies = None
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
@@ -427,6 +447,48 @@ class BandMap:
                 f"Valid abscissa: {valid_abscissa}; "
                 f"valid ordinate: {valid_ordinate}."
             )
+
+        # Overlay MDC maxima from attached self-energies, if any.
+        if abscissa == 'momentum' and self._self_energies is not None:
+            for self_energy in self._self_energies:
+                mdc_maxima = getattr(self_energy, "mdc_maxima", None)
+                if mdc_maxima is None:
+                    continue
+
+                peak_sigma = getattr(self_energy, "peak_positions_sigma", None)
+                xerr = stdv * peak_sigma if peak_sigma is not None else None
+
+                if ordinate == 'kinetic_energy':
+                    y_vals = self_energy.ekin_range
+                else:  # electron energy
+                    y_vals = self_energy.enel_range
+
+                x_vals = mdc_maxima
+                label = getattr(self_energy, "label", None)
+
+                if xerr is not None:
+                    ax.errorbar(
+                        x_vals,
+                        y_vals,
+                        xerr=xerr,
+                        fmt='o',
+                        linestyle='',
+                        label=label,
+                        **marker_kws,
+                    )
+                else:
+                    ax.plot(
+                        x_vals,
+                        y_vals,
+                        linestyle='',
+                        marker='o',
+                        label=label,
+                        **marker_kws,
+                    )
+
+            handles, labels = ax.get_legend_handles_labels()
+            if any(labels):
+                ax.legend()
 
         plt.colorbar(mesh, ax=ax, label='counts (-)')
         return fig

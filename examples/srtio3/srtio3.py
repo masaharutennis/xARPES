@@ -48,7 +48,7 @@ print('The optimised h nu - Phi = ' + f'{bmap.hnuminphi:.4f}' + ' +/- '
 
 from xarpes.constants import dtor
 
-k_0 = -0.0014
+k_0 = -0.0014 # 0.02
 theta_0 = 0
 
 guess_dists = xarpes.CreateDistributions([
@@ -98,8 +98,10 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
 # - However, this would also require setting boundaries for the fitting range.  
 # - Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
 
+fermi_one = 0.122 # 0.142
+
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', 
-                                bare_mass=0.6, fermi_wavevector=0.142, side='right'))
+                                bare_mass=0.6, fermi_wavevector=fermi_one, side='right'))
 
 self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2',
                                 bare_mass=0.6, fermi_wavevector=0.207))
@@ -133,26 +135,44 @@ ax.set_ylim([0, 0.06])
 
 plt.legend(); plt.show()
 
+import numpy as np
+
+from xarpes.constants import pref, dtor
+
+Angl, Ekin = np.meshgrid(bmap.angles, bmap.ekin)
+Mome = np.sqrt(Ekin / xarpes.pref) * np.sin(Angl * dtor)
+
+kmin, kmax = np.min(Mome), np.max(Mome)
+
+kspc = np.linspace(kmin, kmax, len(bmap.angles))
+
+dis1 = xarpes.pref * (((kspc - self_energy.center_wavevector)**2 - self_energy.fermi_wavevector**2)) \
+    / self_energy.bare_mass
+
+# dis1 = self_energy.fermi_velocity * (kspc - self_energy.fermi_wavevector)
+
+# dis2 = self_left.fermi_velocity *(kspc - self_left.fermi_wavevector)
+
 
 fig = plt.figure(figsize=(10, 7))
 ax = fig.gca()
 
-from xarpes.constants import stdv
+self_energies = xarpes.CreateSelfEnergies([self_energy, self_two])
 
-ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-ax.errorbar(self_two.mdc_maxima, self_two.enel_range, 
-            xerr=stdv * self_two.peak_positions_sigma,
-           markersize=2, color='tab:purple', label=self_two.label)
+# ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range, 
+#             xerr=stdv * self_energy.peak_positions_sigma,
+#            markersize=2, color='tab:blue', label=self_energy.label)
+# ax.errorbar(self_two.mdc_maxima, self_two.enel_range, 
+#             xerr=stdv * self_two.peak_positions_sigma,
+#            markersize=2, color='tab:purple', label=self_two.label)
+
+ax.plot(kspc, dis1, linestyle='--')
 
 ax.set_xlim([-0.25, 0.25]); ax.set_ylim([-0.3, 0.1])
 
 plt.legend()
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
-
-plt.show()
 
 
 guess_dists = xarpes.CreateDistributions([
