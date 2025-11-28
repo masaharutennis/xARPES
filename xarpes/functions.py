@@ -255,6 +255,7 @@ def download_examples():
     import shutil
     import io
     import jupytext
+    import tempfile
 
     # Main xARPES repo (examples now live in /examples here)
     repo_url = 'https://github.com/xARPES/xARPES'
@@ -270,7 +271,8 @@ def download_examples():
     # Proceed with download if 'examples' directory does not exist
     repo_parts = repo_url.replace('https://github.com/', '').rstrip('/')
 
-    for ref in f'tags/v{__version__}', 'heads/main':
+    # Try matching tag first, then fall back to main
+    for ref in (f'tags/v{__version__}', 'heads/main'):
         zip_url = f'https://github.com/{repo_parts}/archive/refs/{ref}.zip'
 
         # Make the HTTP request to download the zip file
@@ -283,22 +285,26 @@ def download_examples():
             print('Failed to download the repository. Status code: '
                   f'{response.status_code}')
     else:
+        # Neither tag nor main could be downloaded
         return 1
 
     zip_file_bytes = io.BytesIO(response.content)
 
-    with zipfile.ZipFile(zip_file_bytes, 'r') as zip_ref:
-        zip_ref.extractall(output_dir)
+    # Use a temporary directory to avoid polluting the CWD
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with zipfile.ZipFile(zip_file_bytes, 'r') as zip_ref:
+            zip_ref.extractall(tmpdir)
+            # Get the top-level directory inside the archive
+            first_member = zip_ref.namelist()[0]
+        top_level_dir = first_member.split('/')[0]
+        main_folder_path = os.path.join(tmpdir, top_level_dir)
+        examples_path = os.path.join(main_folder_path, 'examples')
 
-    # Path to the extracted main folder (e.g. xARPES-main)
-    main_folder_path = os.path.join(
-        output_dir,
-        zip_ref.namelist()[0]
-    )
-    examples_path = os.path.join(main_folder_path, 'examples')
+        # Move the 'examples' directory to the target location
+        if not os.path.exists(examples_path):
+            print("Error: downloaded archive does not contain an 'examples' directory.")
+            return 1
 
-    # Move the 'examples' directory to the target location
-    if os.path.exists(examples_path):
         shutil.move(examples_path, final_examples_path)
         print(f"'examples' subdirectory moved to {final_examples_path}")
 
@@ -315,10 +321,9 @@ def download_examples():
                     os.remove(full_path)  # Deletes .Rmd file afterwards
                     print(f'Converted and deleted {full_path}')
 
-    # Remove the rest of the extracted content
-    shutil.rmtree(main_folder_path)
-    print(f'Cleaned up temporary files in {main_folder_path}')
+    print('Cleaned up temporary files.')
     return 0
+
 
 def set_script_dir():
     r"""This function sets the directory such that the xARPES code can be
