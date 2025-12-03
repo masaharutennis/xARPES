@@ -95,18 +95,16 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
 # - However, this would also require setting boundaries for the fitting range.  
 # - Instead, the user is advised to carefully check correspondence of peak maxima with MDC fitting results.
 
-fermi_one = 0.142
-
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', 
-                                bare_mass=0.6, fermi_wavevector=fermi_one, side='right'))
+                                bare_mass=0.6, fermi_wavevector=0.142, side='right'))
 
 self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2',
                                 bare_mass=0.6, fermi_wavevector=0.207))
 
 self_two.side='right'
 
-self_energies = xarpes.CreateSelfEnergies([self_energy, self_two])
 
+self_energies = xarpes.CreateSelfEnergies([self_energy, self_two])
 
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
@@ -165,8 +163,6 @@ ax.plot(kspc, dis1, linestyle='--')
 
 ax.set_xlim([-0.25, 0.25]); ax.set_ylim([-0.3, 0.1])
 
-plt.legend()
-
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
 
@@ -209,25 +205,16 @@ ax = fig.gca()
 
 from xarpes.constants import stdv
 
-ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-ax.errorbar(self_two.mdc_maxima, self_two.enel_range, 
-            xerr=stdv * self_two.peak_positions_sigma,
-           markersize=2, color='tab:purple', label=self_two.label)
-ax.errorbar(self_three.mdc_maxima, self_three.enel_range, 
-            xerr=stdv * self_three.peak_positions_sigma,
-            markersize=2, color='tab:brown', label=self_three.label)
-ax.errorbar(self_four.mdc_maxima, self_four.enel_range, 
-            xerr=stdv * self_four.peak_positions_sigma, 
-            markersize=2, color='palevioletred', label=self_four.label)
+self_total = xarpes.CreateSelfEnergies([
+    self_energy,
+    self_two,
+    self_three,
+    self_four
+])
 
 ax.set_xlim([0, 0.25]); ax.set_ylim([-0.15, 0.05])
 
-plt.legend()
-
-
-bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
+bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, self_energies=self_total)
 
 plt.show()
 
