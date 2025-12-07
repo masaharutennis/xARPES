@@ -40,13 +40,13 @@ fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
 
 fig, ax = plt.subplots(2, 1, figsize=(6, 8))
 
-fig = bmap.correct_fermi_edge(
+bmap.correct_fermi_edge(
       hnuminphi_guess=32, background_guess=1e2,
       integrated_weight_guess=1e3, angle_min=-10, angle_max=10,
       ekin_min=31.96, ekin_max=32.1, true_angle=0,
       ax=ax[0], show=False, fig_close=False)
 
-fig = bmap.plot(ordinate='electron_energy', abscissa='momentum',
+bmap.plot(ordinate='electron_energy', abscissa='momentum',
       ax=ax[1], show=False, fig_close=False)
 
 # Figure customization
@@ -118,27 +118,16 @@ self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_tes
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
-from xarpes.constants import stdv
+self_energies = xarpes.CreateSelfEnergies([self_energy])
 
-ax.errorbar(self_energy.peak_positions, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, 
+                self_energies=self_energies, markersize=1.0)
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
 
-from xarpes.constants import stdv
+fig = self_energy.plot_real(ax=ax)
 
-ax.errorbar(self_energy.enel_range, self_energy.imag, 
-            yerr=stdv * self_energy.imag_sigma, label =r"$-\Sigma''(E)$")
-ax.errorbar(self_energy.enel_range, self_energy.real,
-            yerr=stdv * self_energy.real_sigma, label =r"$\Sigma'(E)$")
-ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r"$\Sigma'(E), -\Sigma''(E)$ (eV)")
-
-plt.legend()
 plt.show()
 
 
@@ -165,33 +154,24 @@ self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_
 fermi_velocity=-2.67, fermi_wavevector=-0.354))
 
 import numpy as np
-
 from xarpes.constants import dtor, pref
 
 Angl, Ekin = np.meshgrid(bmap.angles, bmap.ekin)
 Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
 
 kmin, kmax = np.min(Mome), np.max(Mome)
-
 kspc = np.linspace(kmin, kmax, len(bmap.angles))
 
 dis1 = self_energy.fermi_velocity * (kspc - self_energy.fermi_wavevector)
 
 dis2 = self_left.fermi_velocity *(kspc - self_left.fermi_wavevector)
 
-# ax.set_xlim([np.min(Mome), np.max(Mome)])
-# ax.set_ylim([np.min(Ekin - bmap.hnuminphi), np.max(Ekin - bmap.hnuminphi)])
-
-from importlib import reload
-import xarpes
-reload(xarpes)
-
 
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
 self_energies= xarpes.CreateSelfEnergies([
-    self_energy, 
+    self_energy,
     self_left
     ])
 
@@ -214,12 +194,38 @@ ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range,
 
 ax.plot(kspc, dis1, linestyle='--'); ax.plot(kspc, dis2, linestyle='--')
 
+# Limits are currently needed because of the dispersion relations
 ax.set_xlim([np.min(Mome), np.max(Mome)])
 ax.set_ylim([np.min(Ekin - bmap.hnuminphi), np.max(Ekin - bmap.hnuminphi)])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
 
+fig = plt.figure(figsize=(9, 6)); ax = fig.gca()
 
+self_left.plot_both(ax=ax, show=False, fig_close=False)
+self_energy.plot_both(ax=ax, show=False, fig_close=False)
+
+ax.set_xlim([-0.275, 0.025])
+
+plt.legend(); plt.show()
+
+fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
+
+self_left.plot_both(ax=ax, show=False, fig_close=False)
+self_energy.plot_both(ax=ax, show=False, fig_close=False)
+
+ax.set_xlim([-0.275, 0.025]); ax.set_ylim([-0.025, 0.275])
+
+# Replace labels with custom labels
+left_real, left_imag, right_real, right_imag = ax.get_lines()
+
+labels = [
+    r"$\Sigma_{\mathrm{L}}'(E)$", r"$-\Sigma_{\mathrm{L}}''(E)$",
+    r"$\Sigma_{\mathrm{R}}'(E)$", r"$-\Sigma_{\mathrm{R}}''(E)$",
+]
+
+ax.legend([left_real, left_imag, right_real, right_imag], labels)
+plt.show()
 
 
 # fig = plt.figure(figsize=(8, 5))

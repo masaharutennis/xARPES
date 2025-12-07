@@ -346,14 +346,14 @@ class BandMap:
         return mdcs, angle_range_out, self.angle_resolution, \
         enel_range_out, self.hnuminphi
 
-
     @add_fig_kwargs
     def plot(self, abscissa='momentum', ordinate='electron_energy',
              self_energies=None, ax=None, markersize=None, **kwargs):
         r"""
-        Plot the band map. Optionally attach a collection of self-energies,
+        Plot the band map. Optionally overlay a collection of self-energies,
         e.g. a CreateSelfEnergies instance or any iterable of self-energy
-        objects. They are stored on `self` for later overlay plotting.
+        objects. Self-energies are *not* stored internally; they are used
+        only for this plotting call.
 
         When self-energies are present and ``abscissa='momentum'``, their
         MDC maxima are overlaid with 95 % confidence intervals.
@@ -374,84 +374,104 @@ class BandMap:
                 f"Valid options: {valid_ordinate}"
             )
 
-        # Optionally store self-energies on the instance
+        # Local self-energies container (do not store on self)
+        se_iter = None
         if self_energies is not None:
 
             # MDC maxima are defined in momentum space, not angle space
             if abscissa == 'angle' and isinstance(
                 self_energies, (list, tuple, CreateSelfEnergies)
             ):
-                raise ValueError( "MDC maxima cannot be plotted against "
-                "angles; they are defined in momentum space. Use " \
-                "abscissa='momentum' when passing a list of self-energies.")
+                raise ValueError(
+                    "MDC maxima cannot be plotted against angles; they are "
+                    "defined in momentum space. Use abscissa='momentum' "
+                    "when passing a list of self-energies."
+                )
 
             if not isinstance(self_energies, CreateSelfEnergies):
-                self_energies = CreateSelfEnergies(self_energies)
-
-            self._self_energies = self_energies
-        elif not hasattr(self, "_self_energies"):
-            self._self_energies = None
+                se_iter = CreateSelfEnergies(self_energies)
+            else:
+                se_iter = self_energies
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
-        # Below, **kwargs is 
 
         Angl, Ekin = np.meshgrid(self.angles, self.ekin)
-        
+
         if abscissa == 'angle':
             ax.set_xlabel('Angle ($\\degree$)')
             if ordinate == 'kinetic_energy':
-                mesh = ax.pcolormesh(Angl, Ekin, self.intensities, 
-                    shading='auto', cmap=plt.get_cmap('bone').reversed(), 
-                        **kwargs)
+                mesh = ax.pcolormesh(
+                    Angl, Ekin, self.intensities,
+                    shading='auto',
+                    cmap=plt.get_cmap('bone').reversed(),
+                    **kwargs
+                )
                 ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
             elif ordinate == 'electron_energy':
                 Enel = Ekin - self.hnuminphi
-                mesh = ax.pcolormesh(Angl, Enel, self.intensities, 
-                    shading='auto', cmap=plt.get_cmap('bone').reversed(), 
-                        **kwargs)
+                mesh = ax.pcolormesh(
+                    Angl, Enel, self.intensities,
+                    shading='auto',
+                    cmap=plt.get_cmap('bone').reversed(),
+                    **kwargs
+                )
                 ax.set_ylabel('$E-\\mu$ (eV)')
 
         elif abscissa == 'momentum':
             ax.set_xlabel(r'$k_{//}$ ($\mathrm{\AA}^{-1}$)')
 
             with warnings.catch_warnings(record=True) as wlist:
-                warnings.filterwarnings("always",
-                    message=("The input coordinates to pcolormesh are "
+                warnings.filterwarnings(
+                    "always",
+                    message=(
+                        "The input coordinates to pcolormesh are "
                         "interpreted as cell centers, but are not "
-                        "monotonically increasing or decreasing."),
-                    category=UserWarning)
+                        "monotonically increasing or decreasing."
+                    ),
+                    category=UserWarning,
+                )
 
                 Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
 
                 if ordinate == 'kinetic_energy':
-                    mesh = ax.pcolormesh(Mome, Ekin, self.intensities,
-                        shading='auto', cmap=plt.get_cmap('bone').reversed(), 
-                        **kwargs)
+                    mesh = ax.pcolormesh(
+                        Mome, Ekin, self.intensities,
+                        shading='auto',
+                        cmap=plt.get_cmap('bone').reversed(),
+                        **kwargs
+                    )
                     ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
 
                 elif ordinate == 'electron_energy':
                     Enel = Ekin - self.hnuminphi
-                    mesh = ax.pcolormesh(Mome, Enel, self.intensities, 
-                        shading='auto', cmap=plt.get_cmap('bone').reversed(), 
-                        **kwargs)
+                    mesh = ax.pcolormesh(
+                        Mome, Enel, self.intensities,
+                        shading='auto',
+                        cmap=plt.get_cmap('bone').reversed(),
+                        **kwargs
+                    )
                     ax.set_ylabel('$E-\\mu$ (eV)')
 
             if any("cell centers" in str(w.message) for w in wlist):
-                warnings.warn("Conversion from angle to momenta causes warping "
-                              "of the cell centers. \n Cell edges of the "
-                              "mesh plot may look irregular.", UserWarning, 
-                              stacklevel=2)
+                warnings.warn(
+                    "Conversion from angle to momenta causes warping of the "
+                    "cell centers. \n Cell edges of the mesh plot may look "
+                    "irregular.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
-        if abscissa == 'momentum' and self._self_energies is not None:
-            for self_energy in self._self_energies:
+        if abscissa == 'momentum' and se_iter is not None:
+            for self_energy in se_iter:
                 mdc_maxima = getattr(self_energy, "mdc_maxima", None)
 
                 # If this self-energy doesn't contain maxima, don't plot them
                 if mdc_maxima is None:
                     continue
 
-                peak_sigma = getattr(self_energy, "peak_positions_sigma",
-                    None)
+                peak_sigma = getattr(
+                    self_energy, "peak_positions_sigma", None
+                )
                 xerr = stdv * peak_sigma if peak_sigma is not None else None
 
                 if ordinate == 'kinetic_energy':
@@ -463,16 +483,17 @@ class BandMap:
                 label = getattr(self_energy, "label", None)
 
                 if xerr is not None:
-                    ax.errorbar(x_vals, y_vals, xerr=xerr, fmt='o',
-                                linestyle='', label=label,
-                                markersize=markersize)
+                    ax.errorbar(
+                        x_vals, y_vals, xerr=xerr, fmt='o',
+                        linestyle='', label=label,
+                        markersize=markersize,
+                    )
                 else:
-                    ax.plot(x_vals, y_vals, linestyle='', marker='o',
-                            label=label, markersize=markersize)
-
-            handles, labels = ax.get_legend_handles_labels()
-            if any(labels):
-                ax.legend()
+                    ax.plot(
+                        x_vals, y_vals, linestyle='',
+                        marker='o', label=label,
+                        markersize=markersize,
+                    )
 
             handles, labels = ax.get_legend_handles_labels()
             if any(labels):
@@ -480,7 +501,6 @@ class BandMap:
 
         plt.colorbar(mesh, ax=ax, label='counts (-)')
         return fig
-
 
     @add_fig_kwargs
     def fit_fermi_edge(self, hnuminphi_guess, background_guess=0.0,
@@ -2094,6 +2114,154 @@ class SelfEnergy:
                 )
 
         return self._mdc_maxima
+    
+    def _se_legend_labels(self):
+        """Return (real_label, imag_label) for legend with safe subscripts."""
+        se_label = getattr(self, "label", None)
+
+        if se_label is None:
+            real_label = r"$\Sigma'(E)$"
+            imag_label = r"$-\Sigma''(E)$"
+            return real_label, imag_label
+
+        safe_label = str(se_label).replace("_", r"\_")
+
+        # If the label is empty after conversion, fall back
+        if safe_label == "":
+            real_label = r"$\Sigma'(E)$"
+            imag_label = r"$-\Sigma''(E)$"
+            return real_label, imag_label
+
+        real_label = rf"$\Sigma_{{\mathrm{{{safe_label}}}}}'(E)$"
+        imag_label = rf"$-\Sigma_{{\mathrm{{{safe_label}}}}}''(E)$"
+
+        return real_label, imag_label
+
+    @add_fig_kwargs
+    def plot_real(self, ax=None, **kwargs):
+        r"""Plot the real part Σ' of the self-energy as a function of E-μ.
+
+        Parameters
+        ----------
+        ax : Matplotlib-Axes or None
+            Axis to plot on. Created if not provided by the user.
+        **kwargs :
+            Additional keyword arguments passed to ``ax.errorbar``.
+
+        Returns
+        -------
+        fig : Matplotlib-Figure
+            Figure containing the Σ'(E) plot.
+        """
+
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        x = self.enel_range
+        y = self.real
+        y_sigma = self.real_sigma
+
+        real_label, _ = self._se_legend_labels()
+        kwargs.setdefault("label", real_label)
+
+        if y_sigma is not None:
+            if np.isnan(y_sigma).any():
+                print(
+                    "Warning: some Σ'(E) uncertainty values are missing. "
+                    "Error bars omitted at those energies."
+                )
+            kwargs.setdefault("yerr", stdv * y_sigma)
+
+        ax.errorbar(x, y, **kwargs)
+        ax.set_xlabel(r"$E-\mu$ (eV)")
+        ax.set_ylabel(r"$\Sigma'(E)$ (eV)")
+        ax.legend()
+
+        return fig
+
+    @add_fig_kwargs
+    def plot_imag(self, ax=None, **kwargs):
+        r"""Plot the imaginary part -Σ'' of the self-energy vs. E-μ.
+
+        Parameters
+        ----------
+        ax : Matplotlib-Axes or None
+            Axis to plot on. Created if not provided by the user.
+        **kwargs :
+            Additional keyword arguments passed to ``ax.errorbar``.
+
+        Returns
+        -------
+        fig : Matplotlib-Figure
+            Figure containing the -Σ''(E) plot.
+        """
+
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        x = self.enel_range
+        y = self.imag
+        y_sigma = self.imag_sigma
+
+        _, imag_label = self._se_legend_labels()
+        kwargs.setdefault("label", imag_label)
+
+        if y_sigma is not None:
+            if np.isnan(y_sigma).any():
+                print(
+                    "Warning: some -Σ''(E) uncertainty values are missing. "
+                    "Error bars omitted at those energies."
+                )
+            kwargs.setdefault("yerr", stdv * y_sigma)
+
+        ax.errorbar(x, y, **kwargs)
+        ax.set_xlabel(r"$E-\mu$ (eV)")
+        ax.set_ylabel(r"$-\Sigma''(E)$ (eV)")
+        ax.legend()
+
+        return fig
+
+    @add_fig_kwargs
+    def plot_both(self, ax=None, **kwargs):
+        r"""Plot Σ'(E) and -Σ''(E) vs. E-μ on the same axis."""
+
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        x = self.enel_range
+        real = self.real
+        imag = self.imag
+        real_sigma = self.real_sigma
+        imag_sigma = self.imag_sigma
+
+        real_label, imag_label = self._se_legend_labels()
+
+        # --- plot Σ'
+        kw_real = dict(kwargs)
+        if real_sigma is not None:
+            if np.isnan(real_sigma).any():
+                print(
+                    "Warning: some Σ'(E) uncertainty values are missing. "
+                    "Error bars omitted at those energies."
+                )
+            kw_real.setdefault("yerr", stdv * real_sigma)
+        kw_real.setdefault("label", real_label)
+        ax.errorbar(x, real, **kw_real)
+
+        # --- plot -Σ''
+        kw_imag = dict(kwargs)
+        if imag_sigma is not None:
+            if np.isnan(imag_sigma).any():
+                print(
+                    "Warning: some -Σ''(E) uncertainty values are missing. "
+                    "Error bars omitted at those energies."
+                )
+            kw_imag.setdefault("yerr", stdv * imag_sigma)
+        kw_imag.setdefault("label", imag_label)
+        ax.errorbar(x, imag, **kw_imag)
+
+        ax.set_xlabel(r"$E-\mu$ (eV)")
+        ax.set_ylabel(r"$\Sigma'(E),\ -\Sigma''(E)$ (eV)")
+        ax.legend()
+
+        return fig
 
 
 class CreateSelfEnergies:
@@ -2172,4 +2340,3 @@ class CreateSelfEnergies:
         Return a {label: self_energy} dictionary for convenient access.
         """
         return {se.label: se for se in self.self_energies}
-    

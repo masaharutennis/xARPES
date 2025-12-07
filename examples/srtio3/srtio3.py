@@ -80,14 +80,10 @@ fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
 # - As a fallback, the user may switch from "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
 
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
+fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
 
 fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
                          matrix_args=mat_args, ax=ax)
-
-# fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
-#                          matrix_args=mat_args, ax=ax)
 
 # ##### Notes for quadratic bands
 # - The user has to explicitly assign the peaks as left-hand or right-hand side.  
@@ -111,22 +107,11 @@ ax = fig.gca()
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', self_energies=self_energies, ax=ax)
 
-fig = plt.figure(figsize=(7, 5))
-ax = fig.gca()
 
-from xarpes.constants import stdv
+fig = plt.figure(figsize=(9, 6)); ax = fig.gca()
 
-ax.errorbar(self_energy.enel_range, self_energy.imag,
-            yerr=stdv * self_energy.imag_sigma, label =r"$-\Sigma''_{\rm{IR}}(E)$")
-ax.errorbar(self_energy.enel_range, self_two.imag,
-            yerr=stdv * self_two.imag_sigma, label =r"$-\Sigma''_{\rm{OR}}(E)$")
-ax.errorbar(self_energy.enel_range, self_energy.real,
-            yerr=stdv * self_energy.real_sigma, label =r"$\Sigma'_{\rm{IR}}(E)$")
-ax.errorbar(self_energy.enel_range, self_two.real,
-            yerr=stdv * self_two.real_sigma, label =r"$\Sigma'_{\rm{OR}}(E)$")
-ax.set_xlabel(r'$E-\mu$ (eV)'); ax.set_ylabel(r"$\Sigma'(E), -\Sigma''(E)$ (eV)")
-
-ax.set_ylim([0, 0.06])
+self_energy.plot_both(ax=ax, show=False, fig_close=False)
+self_two.plot_both(ax=ax, show=False, fig_close=False)
 
 plt.legend(); plt.show()
 
@@ -163,7 +148,8 @@ ax.plot(kspc, dis1, linestyle='--')
 
 ax.set_xlim([-0.25, 0.25]); ax.set_ylim([-0.3, 0.1])
 
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy',
+                self_energies=self_energies, ax=ax)
 
 
 guess_dists = xarpes.CreateDistributions([
@@ -203,13 +189,9 @@ self_four = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_nm_2',
 fig = plt.figure(figsize=(10, 7))
 ax = fig.gca()
 
-from xarpes.constants import stdv
-
 self_total = xarpes.CreateSelfEnergies([
-    self_energy,
-    self_two,
-    self_three,
-    self_four
+    self_energy, self_two,
+    self_three,  self_four
 ])
 
 ax.set_xlim([0, 0.25]); ax.set_ylim([-0.15, 0.05])
