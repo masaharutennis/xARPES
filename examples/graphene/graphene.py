@@ -95,6 +95,7 @@ fig = mdcs.visualize_guess(distributions=guess_dists, energy_value=energy_value,
 # #### Note on interactive figures
 # - The interactive figure might not work inside the Jupyter notebooks, despite our best efforts to ensure stability.
 # - As a fallback, the user may switch from "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
+# - For some package versions, a static version of the interactive widget may spuriously show up inside other cells. In that case, uncomment the #get_ipython()... line in the first cell for your notebooks.
 
 
 fig = plt.figure(figsize=(7, 5))
@@ -105,30 +106,21 @@ mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range
 fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
 
-# fig = plt.figure(figsize=(7, 5))
-# ax = fig.gca()
-
-# mdcs.plot(energy_range=[-0.15, -0.05], ax=ax)
-
+fig = plt.figure(figsize=(8, 5))
+ax = fig.gca()
 
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
                                 fermi_velocity=2.85, fermi_wavevector=0.358))
 
-
-fig = plt.figure(figsize=(8, 5))
-ax = fig.gca()
-
 self_energies = xarpes.CreateSelfEnergies([self_energy])
 
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, 
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
                 self_energies=self_energies, markersize=1.0)
 
 
 fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
 
 fig = self_energy.plot_real(ax=ax)
-
-plt.show()
 
 
 angle_min2 = -1e6
@@ -153,52 +145,15 @@ fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
 self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_1',
 fermi_velocity=-2.67, fermi_wavevector=-0.354))
 
-import numpy as np
-from xarpes.constants import dtor, pref
 
-Angl, Ekin = np.meshgrid(bmap.angles, bmap.ekin)
-Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
-
-kmin, kmax = np.min(Mome), np.max(Mome)
-kspc = np.linspace(kmin, kmax, len(bmap.angles))
-
-dis1 = self_energy.fermi_velocity * (kspc - self_energy.fermi_wavevector)
-
-dis2 = self_left.fermi_velocity *(kspc - self_left.fermi_wavevector)
-
-
-fig = plt.figure(figsize=(8, 5))
-ax = fig.gca()
+fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
 
 self_energies= xarpes.CreateSelfEnergies([
-    self_energy,
-    self_left
-    ])
+    self_energy, self_left])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy',
-                self_energies=self_energies,  ax=ax, markersize=1.0)
-
-
-fig = plt.figure(figsize=(8, 5))
-ax = fig.gca()
-
-from xarpes.constants import stdv
-
-ax.errorbar(self_left.mdc_maxima, self_left.enel_range, 
-            xerr=stdv * self_left.peak_positions_sigma,
-           markersize=2, color='tab:red', label=self_left.label)
-
-ax.errorbar(self_energy.mdc_maxima, self_energy.enel_range, 
-            xerr=stdv * self_energy.peak_positions_sigma,
-           markersize=2, color='tab:blue', label=self_energy.label)
-
-ax.plot(kspc, dis1, linestyle='--'); ax.plot(kspc, dis2, linestyle='--')
-
-# Limits are currently needed because of the dispersion relations
-ax.set_xlim([np.min(Mome), np.max(Mome)])
-ax.set_ylim([np.min(Ekin - bmap.hnuminphi), np.max(Ekin - bmap.hnuminphi)])
-
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax)
+                self_energies=self_energies, ax=ax,
+                plot_dispersions=True, markersize=1.0)
 
 fig = plt.figure(figsize=(9, 6)); ax = fig.gca()
 
@@ -206,6 +161,7 @@ self_left.plot_both(ax=ax, show=False, fig_close=False)
 self_energy.plot_both(ax=ax, show=False, fig_close=False)
 
 ax.set_xlim([-0.275, 0.025])
+ax.set_ylim([-0.025, 0.275])
 
 plt.legend(); plt.show()
 

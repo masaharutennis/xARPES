@@ -105,7 +105,8 @@ self_energies = xarpes.CreateSelfEnergies([self_energy, self_two])
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
-fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', self_energies=self_energies, ax=ax)
+fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', 
+                self_energies=self_energies, ax=ax)
 
 
 fig = plt.figure(figsize=(9, 6)); ax = fig.gca()
