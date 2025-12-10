@@ -106,6 +106,8 @@ mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range
 fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
 
+plt.rcParams['lines.markersize'] = 0.8
+
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
@@ -115,7 +117,7 @@ self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_tes
 self_energies = xarpes.CreateSelfEnergies([self_energy])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
-                self_energies=self_energies, markersize=1.0)
+                self_energies=self_energies)
 
 
 fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
@@ -125,6 +127,8 @@ fig = self_energy.plot_real(ax=ax)
 
 angle_min2 = -1e6
 angle_max2 = 0
+
+plt.rcParams['lines.markersize'] = 3.0
 
 mdc2 = xarpes.MDCs(*bmap.mdc_set(angle_min2, angle_max2, energy_range=energy_range))
 
@@ -152,8 +156,8 @@ self_energies= xarpes.CreateSelfEnergies([
     self_energy, self_left])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy',
-                self_energies=self_energies, ax=ax,
-                plot_dispersions=True, markersize=1.0)
+                self_energies=self_energies, plot_dispersions='full',
+                ax=ax)
 
 fig = plt.figure(figsize=(9, 6)); ax = fig.gca()
 

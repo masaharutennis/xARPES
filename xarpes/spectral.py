@@ -349,7 +349,7 @@ class BandMap:
     @add_fig_kwargs
     def plot(self, abscissa='momentum', ordinate='electron_energy',
              self_energies=None, ax=None, markersize=None,
-             plot_dispersions=True, **kwargs):
+             plot_dispersions='none', **kwargs):
         r"""
         Plot the band map. Optionally overlay a collection of self-energies,
         e.g. a CreateSelfEnergies instance or any iterable of self-energy
@@ -358,8 +358,28 @@ class BandMap:
 
         When self-energies are present and ``abscissa='momentum'``, their
         MDC maxima are overlaid with 95 % confidence intervals.
+
+        The `plot_dispersions` argument controls bare-band plotting:
+
+        - "full"   : use the full momentum range of the map (default)
+        - "none"   : do not plot bare dispersions
+        - "kink"   : for each self-energy, use the min/max of its own
+          momentum range (typically its MDC maxima), with
+          `len(self.angles)` points.
+        - "domain" : for SpectralQuadratic, use only the left or right
+          domain relative to `center_wavevector`, based on the self-energy
+          attribute `side` ("left" / "right"); for other cases this behaves
+          as "full".
         """
         import warnings
+
+        plot_disp_mode = plot_dispersions
+        valid_disp_modes = ('full', 'none', 'kink', 'domain')
+        if plot_disp_mode not in valid_disp_modes:
+            raise ValueError(
+                f"Invalid plot_dispersions '{plot_disp_mode}'. "
+                f"Valid options: {valid_disp_modes}."
+            )
 
         valid_abscissa = ('angle', 'momentum')
         valid_ordinate = ('kinetic_energy', 'electron_energy')
@@ -395,18 +415,14 @@ class BandMap:
                 mesh = ax.pcolormesh(
                     Angl, Ekin, self.intensities,
                     shading='auto',
-                    cmap=plt.get_cmap('bone').reversed(),
-                    **kwargs
-                )
+                    cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
             elif ordinate == 'electron_energy':
                 Enel = Ekin - self.hnuminphi
                 mesh = ax.pcolormesh(
                     Angl, Enel, self.intensities,
                     shading='auto',
-                    cmap=plt.get_cmap('bone').reversed(),
-                    **kwargs
-                )
+                    cmap=plt.get_cmap('bone').reversed())
                 ax.set_ylabel('$E-\\mu$ (eV)')
 
         elif abscissa == 'momentum':
@@ -424,26 +440,24 @@ class BandMap:
                 )
 
                 Mome = np.sqrt(Ekin / pref) * np.sin(Angl * dtor)
-                disp_momenta = np.linspace(
-                    np.min(Mome), np.max(Mome), len(self.angles)
+                mome_min = np.min(Mome)
+                mome_max = np.max(Mome)
+                full_disp_momenta = np.linspace(
+                    mome_min, mome_max, len(self.angles)
                 )
 
                 if ordinate == 'kinetic_energy':
                     mesh = ax.pcolormesh(
                         Mome, Ekin, self.intensities,
                         shading='auto',
-                        cmap=plt.get_cmap('bone').reversed(),
-                        **kwargs
-                    )
+                        cmap=plt.get_cmap('bone').reversed())
                     ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
                 elif ordinate == 'electron_energy':
                     Enel = Ekin - self.hnuminphi
                     mesh = ax.pcolormesh(
                         Mome, Enel, self.intensities,
                         shading='auto',
-                        cmap=plt.get_cmap('bone').reversed(),
-                        **kwargs
-                    )
+                        cmap=plt.get_cmap('bone').reversed())
                     ax.set_ylabel('$E-\\mu$ (eV)')
 
                 y_lims = ax.get_ylim()
@@ -466,40 +480,9 @@ class BandMap:
                 if mdc_maxima is None:
                     continue
 
-                # Get next color from the line property cycle
-                color = next(ax._get_lines.prop_cycler)['color']
-
-                # Bare-band dispersion for SpectralLinear self-energies
-                spec_class = getattr(
-                    self_energy, "_class",
-                    self_energy.__class__.__name__,
-                )
-
-                if plot_dispersions and spec_class == "SpectralLinear":
-                    if ordinate == 'electron_energy':
-                        disp_vals = (
-                            self_energy.fermi_velocity
-                            * (disp_momenta
-                               - self_energy.fermi_wavevector)
-                        )
-                    else:  # kinetic energy
-                        disp_vals = (
-                            self_energy.fermi_velocity
-                            * (disp_momenta
-                               - self_energy.fermi_wavevector)
-                            + self.hnuminphi
-                        )
-
-                    band_label = getattr(self_energy, "label", None)
-                    if band_label is not None:
-                        band_label = f"{band_label} (bare)"
-
-                    ax.plot(
-                        disp_momenta, disp_vals,
-                        label=band_label,
-                        linestyle='--',
-                        color=color,
-                    )
+                # Reserve a colour from the axes cycle for this self-energy,
+                # and use it consistently for MDC maxima and dispersion.
+                line_color = ax._get_lines.get_next_color()
 
                 peak_sigma = getattr(
                     self_energy, "peak_positions_sigma", None
@@ -514,19 +497,134 @@ class BandMap:
                 x_vals = mdc_maxima
                 label = getattr(self_energy, "label", None)
 
+                # First plot the MDC maxima, using the reserved colour
                 if xerr is not None:
                     ax.errorbar(
                         x_vals, y_vals, xerr=xerr, fmt='o',
                         linestyle='', label=label,
                         markersize=markersize,
-                        color=color, ecolor=color,
+                        color=line_color, ecolor=line_color,
                     )
                 else:
                     ax.plot(
                         x_vals, y_vals, linestyle='',
                         marker='o', label=label,
                         markersize=markersize,
-                        color=color,
+                        color=line_color,
+                    )
+
+                # Bare-band dispersion for SpectralLinear / SpectralQuadratic
+                spec_class = getattr(
+                    self_energy, "_class",
+                    self_energy.__class__.__name__,
+                )
+
+                if (plot_disp_mode != 'none'
+                        and spec_class in ("SpectralLinear",
+                                           "SpectralQuadratic")):
+
+                    # Determine momentum grid for the dispersion
+                    if plot_disp_mode == 'kink':
+                        x_arr = np.asarray(x_vals)
+                        mask = np.isfinite(x_arr)
+                        if not np.any(mask):
+                            # No valid k-points to define a range
+                            continue
+                        k_min = np.min(x_arr[mask])
+                        k_max = np.max(x_arr[mask])
+                        disp_momenta = np.linspace(
+                            k_min, k_max, len(self.angles)
+                        )
+                    elif (plot_disp_mode == 'domain'
+                          and spec_class == "SpectralQuadratic"):
+                        side = getattr(self_energy, "side", None)
+                        if side == 'left':
+                            disp_momenta = np.linspace(
+                                mome_min, self_energy.center_wavevector,
+                                len(self.angles)
+                            )
+                        elif side == 'right':
+                            disp_momenta = np.linspace(
+                                self_energy.center_wavevector, mome_max,
+                                len(self.angles)
+                            )
+                        else:
+                            # Fallback: no valid side, use full range
+                            disp_momenta = full_disp_momenta
+                    else:
+                        # 'full' or 'domain' for SpectralLinear
+                        disp_momenta = full_disp_momenta
+
+                    # --- Robust parameter checks before computing base_disp ---
+                    if spec_class == "SpectralLinear":
+                        fermi_vel = getattr(
+                            self_energy, "fermi_velocity", None
+                        )
+                        fermi_k = getattr(
+                            self_energy, "fermi_wavevector", None
+                        )
+                        if fermi_vel is None or fermi_k is None:
+                            missing = []
+                            if fermi_vel is None:
+                                missing.append("fermi_velocity")
+                            if fermi_k is None:
+                                missing.append("fermi_wavevector")
+                            raise TypeError(
+                                "Cannot plot bare dispersion for "
+                                "SpectralLinear: "
+                                f"{', '.join(missing)} is None."
+                            )
+
+                        base_disp = (
+                            fermi_vel * (disp_momenta - fermi_k)
+                        )
+
+                    else:  # SpectralQuadratic
+                        bare_mass = getattr(
+                            self_energy, "bare_mass", None
+                        )
+                        center_k = getattr(
+                            self_energy, "center_wavevector", None
+                        )
+                        fermi_k = getattr(
+                            self_energy, "fermi_wavevector", None
+                        )
+
+                        missing = []
+                        if bare_mass is None:
+                            missing.append("bare_mass")
+                        if center_k is None:
+                            missing.append("center_wavevector")
+                        if fermi_k is None:
+                            missing.append("fermi_wavevector")
+
+                        if missing:
+                            raise TypeError(
+                                "Cannot plot bare dispersion for "
+                                "SpectralQuadratic: "
+                                f"{', '.join(missing)} is None."
+                            )
+
+                        dk = disp_momenta - center_k
+                        base_disp = (
+                            pref * (dk ** 2 - fermi_k ** 2) / bare_mass
+                        )
+                    # --- end parameter checks and base_disp construction ---
+
+                    if ordinate == 'electron_energy':
+                        disp_vals = base_disp
+                    else:  # kinetic energy
+                        disp_vals = base_disp + self.hnuminphi
+
+                    band_label = getattr(self_energy, "label", None)
+                    if band_label is not None:
+                        band_label = f"{band_label} (bare)"
+
+                    ax.plot(
+                        disp_momenta, disp_vals,
+                        label=band_label,
+                        linestyle='--',
+                        color=line_color,
                     )
 
             handles, labels = ax.get_legend_handles_labels()
