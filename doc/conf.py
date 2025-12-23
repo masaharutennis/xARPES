@@ -24,6 +24,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'numpydoc',
     'myst_parser',
+    'nbsphinx',
 ]
 
 exclude_patterns = ['README.md']

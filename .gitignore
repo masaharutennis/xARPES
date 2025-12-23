@@ -81,6 +81,10 @@ target/
 .ipynb_checkpoints
 *.ipynb
 
+# --- allow tracked notebooks in documentation ---
+!doc/notebooks/
+!doc/notebooks/*.ipynb
+
 # IPython
 profile_default/
 ipython_config.py

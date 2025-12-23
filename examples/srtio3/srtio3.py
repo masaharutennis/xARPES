@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-# # $\rm{SrTiO}_3$ example
-# ### In this example, we extract the self-energies and Eliashberg function from  
-# ### a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of $\rm{SrTiO}_3$.
+# # SrTiO<sub>3</sub>
+
+# In this example, we extract the self-energies and Eliashberg function from  
+# a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of  
+# $\rm{SrTiO}_3$.
 
 import matplotlib as mpl
 mpl.use('Qt5Agg')
@@ -23,16 +25,36 @@ extn = '.ibw' # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 
+# The following cell instantiates band map class object based on the Igor Binary Wave (ibw) file. 
+
+# The subsequent (commented) cell illustrates how a band map object could be instantiated with NumPy arrays instead.
+
 
 fig = plt.figure(figsize=(8, 5))
 ax = fig.gca()
 
-bmap = xarpes.BandMap(data_file_path, energy_resolution=0.01,
+bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01,
                       angle_resolution=0.2, temperature=20)
 
 bmap.shift_angles(shift=-0.57)
 
 fig = bmap.plot(abscissa='angle', ordinate='kinetic_energy', ax=ax)
+
+
+# import numpy as np
+
+# intensities= np.load(os.path.join(dfld, "STO_2_0010STO_2_intensities.npy"))
+# angles = np.load(os.path.join(dfld, "STO_2_0010STO_2_angles.npy"))
+# ekin = np.load(os.path.join(dfld, "STO_2_0010STO_2_ekin.npy"))
+
+# bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01,
+#                       angle_resolution=0.2, temperature=20)
+
+# bmap.shift_angles(shift=-0.57)
+
+# fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
+
+# fig = bmap.plot(abscissa='angle', ordinate='kinetic_energy', ax=ax)
 
 
 fig = bmap.fit_fermi_edge(hnuminPhi_guess=42.24, background_guess=1e4,
@@ -73,7 +95,7 @@ ax = fig.gca()
 fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
                            matrix_args=mat_args, energy_value=-0.000, ax=ax)
 
-# #### Note on interactive figures
+# **Note on interactive figures**
 # - The interactive figure might not work inside the Jupyter notebooks, despite our best efforts to ensure stability.
 # - As a fallback, the user may switch from "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
 # - For some package versions, a static version of the interactive widget may spuriously show up inside other cells. In that case, uncomment the #get_ipython()... line in the first cell for your notebooks.
@@ -84,7 +106,7 @@ fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
 fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
                          matrix_args=mat_args, ax=ax)
 
-# ##### Notes for quadratic bands
+# **Note on interactive figures**
 # - The user has to explicitly assign the peaks as left-hand or right-hand side.  
 # - In theory, one could incorporate such information in a minus sign of the peak position.  
 # - However, this would also require setting boundaries for the fitting range.  

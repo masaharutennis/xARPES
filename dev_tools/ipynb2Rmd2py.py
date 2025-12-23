@@ -231,6 +231,9 @@ def main() -> None:
                 continue
 
             ipynb = os.path.join(path, name)
+
+            copy_ipynb_to_docs(ipynb, base_dir)
+
             ok = run_jupytext_ipynb_to_rmd(ipynb)
             converted_any = converted_any or ok
 
@@ -255,6 +258,43 @@ def main() -> None:
 
             # Convert .Rmd -> .py
             convert_rmd_to_py(rmd)
+
+
+def copy_ipynb_to_docs(ipynb_path: str, base_dir: str) -> None:
+    """
+    Copy ipynb into <repo>/doc/notebooks, flattening any subfolders.
+
+    If two notebooks share the same filename, disambiguate by appending a
+    suffix derived from their relative directory.
+    """
+    repo_root = os.path.dirname(base_dir)
+    dst_dir = os.path.join(repo_root, "doc", "notebooks")
+    os.makedirs(dst_dir, exist_ok=True)
+
+    name = os.path.basename(ipynb_path)
+    dst = os.path.join(dst_dir, name)
+
+    if os.path.exists(dst):
+        # Disambiguate collisions by using the relative folder path.
+        rel_dir = os.path.relpath(os.path.dirname(ipynb_path), base_dir)
+        rel_dir = "" if rel_dir == "." else rel_dir
+        suffix = re.sub(r"[^A-Za-z0-9]+", "_", rel_dir).strip("_")
+        root, ext = os.path.splitext(name)
+        new_name = f"{root}__{suffix}{ext}" if suffix else name
+        dst = os.path.join(dst_dir, new_name)
+
+        # If *still* colliding, add a numeric suffix.
+        if os.path.exists(dst):
+            i = 2
+            while True:
+                new_name = f"{root}__{suffix}__{i}{ext}" if suffix else \
+                           f"{root}__{i}{ext}"
+                dst = os.path.join(dst_dir, new_name)
+                if not os.path.exists(dst):
+                    break
+                i += 1
+
+    shutil.copy2(ipynb_path, dst)
 
 
 if __name__ == "__main__":

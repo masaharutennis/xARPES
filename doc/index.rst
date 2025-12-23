@@ -13,6 +13,13 @@
    modules/settings_plots
 
 .. toctree::
+   :caption: Tutorials
+   :hidden:
+
+   notebooks/graphene
+   notebooks/srtio3
+
+.. toctree::
    :caption: More
    :hidden:
 

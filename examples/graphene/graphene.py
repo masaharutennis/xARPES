@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 # # Intercalated graphene
-# ### In this example, we extract the self-energies and Eliashberg function of
-# ### intercalated graphene.
-# ### Data have been provided with permission from re-use, originating from
-# ### https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.085132.
+# In this example, we extract the self-energies and Eliashberg function of
+# intercalated graphene.
+
+# Data have been provided with permission for re-use, originating from:
+# https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.085132
+
 
 import matplotlib as mpl
 mpl.use('Qt5Agg')
@@ -25,15 +27,33 @@ extn = '.ibw'         # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 
+# The following cell instantiates band map class object based on the Igor Binary Wave (ibw) file. The subsequent (commented) cell illustrates how a band map object could be instantiated with NumPy arrays instead.
 
-fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
 
-bmap = xarpes.BandMap(data_file_path, energy_resolution=0.01,
-                      angle_resolution=0.1, temperature=50)
+bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01, 
+        angle_resolution=0.1, temperature=50)
 
 bmap.shift_angles(shift=-2.28)
 
+fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
+
 fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
+
+
+# import numpy as np
+
+# intensities= np.load(os.path.join(dfld, "graphene_152_intensities.npy"))
+# angles = np.load(os.path.join(dfld, "graphene_152_angles.npy"))
+# ekin = np.load(os.path.join(dfld, "graphene_152_ekin.npy"))
+
+# bmap = xarpes.BandMap.from_np_arrays(intensities, angles, ekin, 
+#         energy_resolution=0.01, angle_resolution=0.1, temperature=50)
+
+# bmap.shift_angles(shift=-2.28)
+
+# fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
+
+# fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
 
 
 fig, ax = plt.subplots(2, 1, figsize=(6, 8))
@@ -90,7 +110,7 @@ ax = fig.gca()
 
 fig = mdcs.visualize_guess(distributions=guess_dists, energy_value=energy_value, ax=ax)
 
-# #### Note on interactive figures
+# **Note on interactive figures**
 # - The interactive figure might not work inside the Jupyter notebooks, despite our best efforts to ensure stability.
 # - As a fallback, the user may switch from "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
 # - For some package versions, a static version of the interactive widget may spuriously show up inside other cells. In that case, uncomment the #get_ipython()... line in the first cell for your notebooks.
