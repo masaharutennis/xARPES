@@ -70,7 +70,7 @@ Answer `y` to questions. Create and activate a new environment:
     conda create -n <my_env> -c conda-forge  
     conda activate <my_env>
 
-Where `<my_env>` must be replaced by your desired name. Package compatibility ssues may arise if conda installs from different channels. This can be prevented by appending `--strict-channel-priority` to the creation command.
+Where `<my_env>` must be replaced by your desired name. Package compatibility issues may arise if conda installs from different channels. This can be prevented by appending `--strict-channel-priority` to the creation command.
 
 ### Installing xARPES
 
@@ -127,11 +127,16 @@ Then perform editable installation:
 
 # Examples
 
-After installation of xARPES, the `examples/` folder can be downloaded to the current directory:
+After installation of xARPES, the `examples/` folder can be downloaded from the terminal into the current directory:
 
-    python -c "import xarpes; xarpes.download_examples()"
+    xarpes_download_examples
 
 This attempts to download the examples from the version corresponding encountered in `__init__.py`. If no corresponding tagged version can be downloaded, the code attempts to download the latest examples instead.
+
+The examples can also be installed by executing `.py`or `.ipynb` executable files containing the following:
+
+    import xarpes
+    xarpes.download_examples()
 
 # Execution
 
