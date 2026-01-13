@@ -32,6 +32,10 @@ class MDCs:
         Angular grid corresponding to the MDCs [degrees].
     angle_resolution : float
         Angular step size or effective angular resolution [degrees].
+    energy_resolution : float
+        Energy resolution associated with the MDCs [eV].
+    temperature: float
+            Temperature associated with the band map [K].
     enel : ndarray or float
         Electron binding energies of the MDC slices [eV].
         Can be a scalar for a single MDC.
@@ -83,11 +87,13 @@ class MDCs:
     
     """
 
-    def __init__(self, intensities, angles, angle_resolution, enel, hnuminPhi):
-        # Core input data (read-only)
+    def __init__(self, intensities, angles, angle_resolution,
+                energy_resolution, temperature, enel, hnuminPhi):
         self._intensities = intensities
         self._angles = angles
         self._angle_resolution = angle_resolution
+        self._energy_resolution = energy_resolution
+        self._temperature = temperature
         self._enel = enel
         self._hnuminPhi = hnuminPhi
 
@@ -104,8 +110,39 @@ class MDCs:
 
     @property
     def angle_resolution(self):
-        """Angular step size (float)."""
+        """Angular resolution (float)."""
         return self._angle_resolution
+    
+    @angle_resolution.setter
+    def angle_resolution(self, _):
+        """Setter for the angle resolution. This raises an attribute error
+        as the angle resolution needs to be derived from the band map."""
+        raise AttributeError("`angle_resolution` is read-only; set it via the "
+        "constructor.")
+    
+    @property
+    def energy_resolution(self):
+        """Energy resolution (float)."""
+        return self._energy_resolution
+    
+    @energy_resolution.setter
+    def energy_resolution(self, _):
+        """Setter for the energy resolution. This raises an attribute error
+        as the energy resolution needs to be derived from the band map."""
+        raise AttributeError("`energy_resolution` is read-only; set it via the "
+        "constructor.")
+    
+    @property
+    def temperature(self):
+        """Temperature (float)."""
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, _):
+        """Setter for the temperature. This raises an attribute error as the
+        temperature needs to be derived from the band map."""
+        raise AttributeError("`temperature` is read-only; set it via the "
+        "constructor.")
 
     @property
     def enel(self):
@@ -114,7 +151,8 @@ class MDCs:
 
     @enel.setter
     def enel(self, _):
-        raise AttributeError("`enel` is read-only; set it via the constructor.")
+        raise AttributeError("`enel` is read-only; set it via the " \
+        "constructor.")
 
     @property
     def hnuminPhi(self):
@@ -962,6 +1000,10 @@ class MDCs:
             Kinetic-energy grid corresponding to the selected label.
         hnuminPhi : float
             Photoelectron work-function offset.
+        energy_resolution : float
+            Energy resolution associated with the extracted self-energy data.
+        temperature : float
+            Temperature [K] associated with the extracted self-energy data.
         label : str
             Label of the selected distribution.
         selected_properties : dict or list of dict
@@ -1031,5 +1073,6 @@ class MDCs:
                     if key not in ("label", "_class"):
                         exported_parameters[key] = val
 
-        return (self._ekin_range, self.hnuminPhi, select_label,
-                selected_properties, exported_parameters)
+        return (self._ekin_range, self.hnuminPhi, self.energy_resolution,
+                self.temperature, select_label, selected_properties, 
+                exported_parameters)

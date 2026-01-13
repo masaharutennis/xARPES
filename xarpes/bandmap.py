@@ -273,23 +273,51 @@ class BandMap:
         
     def mdc_set(self, angle_min, angle_max, energy_value=None,
                 energy_range=None):
-        r"""Returns a set of MDCs. Documentation is to be further completed.
-        
+        r"""Return a set of momentum distribution curves (MDCs).
+
+        This method extracts MDCs from the stored ARPES intensity map from a
+        specified angular interval and either selecting a single energy slice
+        or an energy window.
+
         Parameters
         ----------
         angle_min : float
-            Minimum angle of integration interval [degrees]
+            Minimum angle of the integration interval [degrees].
         angle_max : float
-            Maximum angle of integration interval [degrees]
+            Maximum angle of the integration interval [degrees].
+        energy_value : float, optional
+            Energy value [same units as ``self.enel``] at which a single MDC
+            is extracted. Exactly one of ``energy_value`` or ``energy_range``
+            must be provided.
+        energy_range : array-like, optional
+            Energy interval [same units as ``self.enel``] over which MDCs are
+            extracted. Exactly one of ``energy_value`` or ``energy_range``
+            must be provided.
 
         Returns
         -------
-        angle_range : ndarray
-            Array of size n containing the angular values
-        energy_range : ndarray
-            Array of size m containing the energy values
         mdcs : ndarray
-            Array of size n x m containing the MDC intensities
+            Extracted MDC intensities. Shape is ``(n_angles,)`` when a single
+            ``energy_value`` is provided, or ``(n_energies, n_angles)`` when
+            an ``energy_range`` is provided.
+        angle_range : ndarray
+            Angular values corresponding to the MDCs [degrees].
+        angle_resolution : float
+            Angular resolution associated with the MDCs.
+        energy_resolution : float
+            Energy resolution associated with the MDCs.
+        temperature: float
+            Temperature associated with the band map [K].
+        energy_range : ndarray or float
+            Energy value (scalar) or energy array corresponding to the MDCs.
+        hnuminPhi : float
+            Photon-energy-related offset propagated from the BandMap.
+
+        Raises
+        ------
+        ValueError
+            If neither or both of ``energy_value`` and ``energy_range`` are
+            provided.
 
         """
 
@@ -316,8 +344,8 @@ class BandMap:
             mdcs = self.intensities[energy_indices,
                                     angle_min_index:angle_max_index + 1]
 
-        return mdcs, angle_range_out, self.angle_resolution, \
-        enel_range_out, self.hnuminPhi
+        return (mdcs, angle_range_out, self.angle_resolution, 
+                self.energy_resolution, self.temperature, enel_range_out, self.hnuminPhi)
 
     @add_fig_kwargs
     def plot(self, abscissa='momentum', ordinate='electron_energy',
@@ -757,9 +785,8 @@ class BandMap:
         angle_range = self.angles[angle_min_index:angle_max_index + 1]
         energy_range = self.ekin[ekin_min_index:ekin_max_index + 1]
         
-        angle_shape = angle_range.shape
-        nmps = np.zeros(angle_shape)
-        stds = np.zeros(angle_shape)
+        nmps = np.zeros_like(angle_range, dtype=float)
+        stds = np.zeros_like(angle_range, dtype=float)
         
         hnuminPhi_left = hnuminPhi_guess - (true_angle - angle_min) \
         * slope_guess
@@ -797,7 +824,7 @@ class BandMap:
                                  stds)
 
         linsp = lin_fun(angle_range, popt[0], popt[1])
-            
+
         # Update hnuminPhi; automatically sets self.enel
         self.hnuminPhi = lin_fun(true_angle, popt[0], popt[1])
         self.hnuminPhi_std = np.sqrt(true_angle**2 * pcov[1, 1] + pcov[0, 0] 

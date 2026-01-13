@@ -240,51 +240,6 @@ def fit_leastsq(p0, xdata, ydata, function, resolution=None,
     return pfit, pcov
 
 
-def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U, 
-             t_criterion=1e-4, iter_max=1e4):
-    r"""
-    Extracts the unscaled Eliashberg spectrum for a given value of the
-    Lagrange multiplier alpha. It also returns the reconstruction F.
-    """
-    import numpy as np
-
-    spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
-    alphamu = alpha + mu
-
-    converged = False
-    iter_count = 0
-    while not converged and iter_count < iter_max:
-  
-        T = V_Sigma @ (U.T @ spectrum_in)  # Below Eq. 7
-        gvec = V_Sigma.T @ (wvec * (T - dvec))  # Eq. 10
-        M = V_Sigma.T @ ((wvec[:, None] * V_Sigma))  # Above Eq. 11
-        K = U.T @ (spectrum_in[:, None] * U)# Above Eq. 11
-
-        xi, P = np.linalg.eigh(K)  # Eq. 13
-        sqrt_xi = np.sqrt(xi)
-        P_sqrt_xi = P * sqrt_xi[None, :]    
-        A = P_sqrt_xi.T @ (M @ P_sqrt_xi)  # Between Eqs. 13 and 14
-        Lambda, R = np.linalg.eigh(A)  # Eq. 14
-        Y_inv = R.T @ (sqrt_xi[:, None] * P.T)  # Below Eq. 15
-        # From eq. 16:
-        Y_inv_du = -(Y_inv @ (alpha * uvec + gvec)) / (alphamu + Lambda)
-        d_uvec = (-alpha * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
-                  ) / alphamu  # Eq. 20
-        uvec += d_uvec
-        spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
-
-        # Convergence block: Section 2.3
-        alpha_K_u = alpha * (K @ uvec) # Skipping the minus sign twice
-        K_g = K @ gvec
-        tcon = 2 * np.linalg.norm(alpha_K_u + K_g)**2 / (np.linalg.norm(alpha_K_u) 
-            + np.linalg.norm(K_g))**2
-        converged = (tcon < t_criterion)
-
-        iter_count += 1
-
-    return spectrum_in
-
-
 def download_examples():
     """Downloads the examples folder from the main xARPES repository only if it
     does not already exist in the current directory. Prints executed steps and a
@@ -436,3 +391,189 @@ def set_script_dir():
         script_dir = os.getcwd()
 
     return script_dir
+
+
+def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U, 
+             t_criterion=1e-4, iter_max=1e4):
+    r"""
+    Implementation of Bryan's algorithm (not to be confused with Bryan's 
+    'method' for determining the Lagrange multiplier alpha. For details, see
+    Eur. Biophys. J. 18, 165 (1990).
+    """
+    import numpy as np
+
+    spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
+    alphamu = alpha + mu
+
+    converged = False
+    iter_count = 0
+    while not converged and iter_count < iter_max:
+  
+        T = V_Sigma @ (U.T @ spectrum_in)  # Below Eq. 7
+        gvec = V_Sigma.T @ (wvec * (T - dvec))  # Eq. 10
+        M = V_Sigma.T @ ((wvec[:, None] * V_Sigma))  # Above Eq. 11
+        K = U.T @ (spectrum_in[:, None] * U)# Above Eq. 11
+
+        xi, P = np.linalg.eigh(K)  # Eq. 13
+        sqrt_xi = np.sqrt(xi)
+        P_sqrt_xi = P * sqrt_xi[None, :]    
+        A = P_sqrt_xi.T @ (M @ P_sqrt_xi)  # Between Eqs. 13 and 14
+        Lambda, R = np.linalg.eigh(A)  # Eq. 14
+        Y_inv = R.T @ (sqrt_xi[:, None] * P.T)  # Below Eq. 15
+        # From eq. 16:
+        Y_inv_du = -(Y_inv @ (alpha * uvec + gvec)) / (alphamu + Lambda)
+        d_uvec = (-alpha * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
+                  ) / alphamu  # Eq. 20
+        uvec += d_uvec
+        spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
+
+        # Convergence block: Section 2.3
+        alpha_K_u = alpha * (K @ uvec) # Skipping the minus sign twice
+        K_g = K @ gvec
+        tcon = 2 * np.linalg.norm(alpha_K_u + K_g)**2 / (np.linalg.norm(alpha_K_u) 
+            + np.linalg.norm(K_g))**2
+        converged = (tcon < t_criterion)
+
+        iter_count += 1
+
+    return spectrum_in
+
+
+def bose_einstein(omega, k_BT):
+    """Bose-Einstein distribution n_B(omega) for k_BT > 0 and omega >= 0."""
+    x_over = np.log(np.finfo(float).max)  # ~709.78 for float64
+
+    x = omega / k_BT
+
+    out = np.empty_like(omega, dtype=float)
+
+    momega0 = (omega == 0)
+    if np.any(momega0):
+        out[momega0] = np.inf
+
+    mpos_big = (x > x_over) & (omega != 0)
+    if np.any(mpos_big):
+        out[mpos_big] = 0.0
+
+    mnorm = (omega != 0) & ~mpos_big
+    if np.any(mnorm):
+        out[mnorm] = 1.0 / np.expm1(x[mnorm])
+
+    return out
+
+
+def fermi(omega, k_BT):
+    """Fermi-Dirac distribution f(omega) for k_BT > 0 and omega >= 0.
+    Could potentially be made a core block of the FermiDirac distribution."""
+    x_over = np.log(np.finfo(float).max)  # ~709.78 for float64
+
+    x = omega / k_BT
+    out = np.empty_like(omega, dtype=float)
+
+    mover = x > x_over
+    out[mover] = 0.0
+
+    mnorm = ~mover
+    y = np.exp(-x[mnorm])
+    out[mnorm] = y / (1.0 + y)
+
+    return out
+
+
+def create_kernel_function(enel, omega, k_BT):
+    r"""Kernel function. Eq. 17 from https://arxiv.org/abs/2508.13845.
+
+    Returns
+    -------
+    K : ndarray, complex
+        Shape (enel.size, omega.size) if enel and omega are 1D.
+    """
+    from scipy.special import digamma
+
+    enel = enel[:, None]     # (Ne, 1)
+    omega = omega[None, :]   # (1, Nw)
+
+    denom = 2.0 * np.pi * k_BT
+
+    K = (digamma(0.5 - 1j * (enel - omega) / denom)
+         - digamma(0.5 - 1j * (enel + omega) / denom)
+         - 2j * np.pi * (bose_einstein(omega, k_BT) + 0.5))
+
+    # Notice the minus sign in the following concatenation
+    K = np.concatenate((np.real(K), -np.imag(K)))
+
+    return K
+
+
+def singular_value_decomposition(kernel, sigma_svd):
+    r"""
+    Some papers use kernel = U Sigma V^T; we follow Bryan's algorithm.
+    """
+    V, Sigma, U_transpose = np.linalg.svd(kernel)
+    U = U_transpose.T
+    Sigma = Sigma[Sigma > sigma_svd]
+    s_reduced = Sigma.size
+    V = V[:, :s_reduced]
+    U = U[:, :s_reduced]
+    V_Sigma = V * Sigma[None, :]
+
+    print('Dimensionality has been reduced from rank ' + str(min(kernel.shape)) +
+          ' to ' + str(int(s_reduced)) + '.')
+          
+    return V_Sigma, U
+
+
+def create_model_function(omega, omega_I, omega_M, omega_S, h_n):
+    r"""Piecewise model m_n(omega) defined on the omega grid.
+
+    Implements the piecewise definition in the figure, interpreting
+    omega_min/max as omega.min()/omega.max().
+
+    Parameters
+    ----------
+    omega : ndarray
+        Frequency grid (assumed sorted, but only min/max are used).
+    omega_I : float
+        ω_n^I
+    omega_M : float
+        ω_n^M
+    omega_S : float
+        ω_n^S
+    h_n : float
+        h_n in the prefactor m_n(omega) = 2 h_n * ( ... ).
+
+    Returns
+    -------
+    model : ndarray
+        m_n(omega) evaluated on the omega grid.
+    """
+    w_min = omega.min()
+    w_max = omega.max()
+
+    if omega_I <= 0:
+        raise ValueError("omega_I must be > 0.")
+    denom = w_max + omega_S - omega_M
+    if denom == 0:
+        raise ValueError("omega_max + omega_S - omega_M must be nonzero.")
+
+    w_I_half = 0.5 * omega_I
+    w_mid = 0.5 * (w_max + omega_S + omega_M)
+
+    domains = np.empty_like(omega)
+
+    m1 = (omega >= w_min) & (omega < w_I_half)
+    domains[m1] = (omega[m1] / omega_I) ** 2
+
+    m2 = (omega >= w_I_half) & (omega < omega_I)
+    domains[m2] = 0.5 - (omega[m2] / omega_I - 1.0) ** 2
+
+    m3 = (omega >= omega_I) & (omega < omega_M)
+    domains[m3] = 0.5
+
+    m4 = (omega >= omega_M) & (omega < w_mid)
+    domains[m4] = 0.5 - ((omega[m4] - omega_M) / denom) ** 2
+
+    m5 = (omega >= w_mid) & (omega <= w_max)
+    domains[m5] = ((omega[m5] - omega_M) / denom - 1.0) ** 2
+
+    return 2.0 * h_n * domains

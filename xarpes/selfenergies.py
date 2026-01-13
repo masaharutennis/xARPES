@@ -13,15 +13,18 @@
 
 import numpy as np
 from .plotting import get_ax_fig_plt, add_fig_kwargs
-from .constants import PREF
+from .constants import PREF, KILO, K_B
 
 class SelfEnergy:
-    r"""Self-energy (ekin-leading; hnuminPhi/ekin are read-only)."""
+    r"""Self-energy"""
 
-    def __init__(self, ekin_range, hnuminPhi, label, properties, parameters):
+    def __init__(self, ekin_range, hnuminPhi, energy_resolution,
+                 temperature, label, properties, parameters):
         # core read-only state
         self._ekin_range = ekin_range
         self._hnuminPhi = hnuminPhi
+        self._energy_resolution = energy_resolution
+        self._temperature = temperature
         self._label = label
 
         # accept either a dict or a single-element list of dicts
@@ -101,6 +104,16 @@ class SelfEnergy:
     @property
     def hnuminPhi(self):
         return self._hnuminPhi
+    
+    @property
+    def energy_resolution(self):
+        """Energy resolution associated with the self-energy."""
+        return self._energy_resolution
+    
+    @property
+    def temperature(self):
+        """Temperature associated with the self-energy [K]."""
+        return self._temperature
 
     # ---------------- identifiers ----------------
     @property
@@ -252,7 +265,7 @@ class SelfEnergy:
     # ---------------- derived outputs ----------------
     @property
     def peak_positions(self):
-        r"""k_parallel = peak * dtor * sqrt(ekin_range / pref) (lazy)."""
+        r"""k_parallel = peak * dtor * sqrt(ekin_range / PREF) (lazy)."""
         if self._peak_positions is None:
             if self._peak is None or self._ekin_range is None:
                 return None
@@ -541,6 +554,69 @@ class SelfEnergy:
         ax.legend()
 
         return fig
+
+    def extract_a2f(self, omega_min, omega_max, omega_num, omega_I, omega_M, 
+                    omega_S, h_n, alpha_min, alpha_max, alpha_num, method,
+                    impurity_scattering=0.0, sigma_svd=1e-4):
+        r"""
+        Extract Eliashberg function α²F(ω) from the self-energy.
+        """
+        from . import (create_model_function, create_kernel_function, 
+                       singular_value_decomposition, MEM_core)
+
+        # # Convert user-provided energies from meV to eV
+        # omega_min /= KILO
+        # omega_max /= KILO
+        # omega_I /= KILO
+        # omega_M /= KILO
+        # omega_S /= KILO
+        # impurity_scattering /= KILO
+
+        omega_range = np.linspace(omega_min, omega_max, omega_num)
+
+        # Create the model and rescale it for the MEM loop
+        model = create_model_function(omega_range, omega_I, omega_M,
+                                       omega_S, h_n)
+            
+        model_in = model * omega_max / omega_num
+        
+        k_BT = K_B * self.temperature * KILO
+        energies = self.enel_range * KILO
+        kernel = create_kernel_function(energies, omega_range, k_BT)
+
+        V_Sigma, U = singular_value_decomposition(kernel, sigma_svd)
+ 
+        # For the chi2kink method, a logarithmic range is convenient. For
+        # other methods, a linear range or a single value is more relevant.
+        if method == "chi2kink":
+            alpha_range = np.logspace(alpha_min, alpha_max, alpha_num)
+
+        real = self.real * KILO
+        real_sigma = self.real_sigma * KILO
+        imag = (self.imag  * KILO) - impurity_scattering
+        imag_sigma = self.imag_sigma * KILO
+
+        dvec = np.concatenate((real, imag))
+        wvec = np.concatenate((real_sigma**(-2), imag_sigma**(-2)))
+
+        alpha = 14.591965
+
+        s_reduced = np.shape(U[1])
+        uvec = np.zeros(s_reduced)
+        uvec[0] = 0.1
+        mu = 0.1
+
+        spectrum_in = MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
+                               t_criterion=1e-7)                              
+                               
+
+        spectrum = spectrum_in * omega_num / omega_max
+
+        return spectrum, model
+
+
+
+
 
 
 class CreateSelfEnergies:
