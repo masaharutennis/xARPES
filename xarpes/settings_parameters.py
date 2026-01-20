@@ -28,3 +28,44 @@ def parameter_settings(new_sigma_extend=None, new_sigma=None):
 
     if new_sigma is not None:
         sigma_confidence = float(new_sigma)
+
+# ---------------- Defaults for MEM / chi2kink alpha-selection ----------------
+
+mem_defaults = {
+    "method": "chi2kink",
+    "parts": "both",
+    "iter_max": 1e4,
+    "alpha_min": 1.0,
+    "alpha_max": 9.0,
+    "alpha_num": 10,
+    "ecut_left": 0.0,
+    "ecut_right": None,
+    "f_chi_squared": None,
+    "W": None,
+    "power": 4,
+    "mu": 1.0,
+    "omega_S": 1.0,
+    "sigma_svd": 1e-4,
+    "t_criterion": 1e-8,
+    "a_guess": 1.0,
+    "b_guess": 2.5,
+    "c_guess": 3.0,
+    "d_guess": 1.5,
+    "h_n": None, 
+    "impurity_magnitude": 0.0,
+    "lambda_el": 0.0,
+}
+
+# ---------------- Defaults for bayesian_loop optimisation --------------------
+
+loop_defaults = {
+    "converge_iters": 50,
+    "tole": 1e-2,
+    "scale_vF": 1.0,
+    "scale_mb": 1.0,
+    "scale_imp": 1.0,
+    "scale_kF": 1.0,
+    "scale_lambda_el": 1.0,
+    "scale_hn": 1.0,
+    "opt_iter_max": 1e4,
+}
