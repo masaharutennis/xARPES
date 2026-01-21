@@ -148,7 +148,7 @@ fig = mdcs.visualize_guess(distributions=guess_dists, energy_value=energy_value,
 - For some package versions, a static version of the interactive widget may spuriously show up inside other cells. In that case, uncomment the #get_ipython()... line in the first cell for your notebooks.
 
 ```{python}
-# %matplotlib widget
+# %matplotlib inline
 
 fig = plt.figure(figsize=(8, 6))
 ax = fig.gca()
@@ -172,7 +172,7 @@ self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_tes
 self_energies = xarpes.CreateSelfEnergies([self_energy])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
-                self_energies=self_energies)
+                self_energies=self_energies, plot_dispersions='full')
 ```
 
 ```{python}

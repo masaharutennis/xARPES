@@ -135,7 +135,7 @@ self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_tes
 self_energies = xarpes.CreateSelfEnergies([self_energy])
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
-                self_energies=self_energies)
+                self_energies=self_energies, plot_dispersions='full')
 
 
 xarpes.parameter_settings(new_sigma=4)
