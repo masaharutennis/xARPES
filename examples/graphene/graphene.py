@@ -209,3 +209,86 @@ labels = [
 
 ax.legend([left_real, left_imag, right_real, right_imag], labels)
 plt.show()
+
+# Eliashberg function α²F(ω) via MEM + Bayesian outer loop
+#
+# Key point:
+# - Start with a *single evaluation* (vary=()) to check MEM stability.
+# - Only then enable optimisation (vary=(...)).
+#
+# Units:
+# - Frequencies ω are in meV.
+
+import numpy as np
+
+# Avoid ω≈0: n_B(ω) gets large as ω→0 and can make the kernel ill-conditioned.
+# For parts="both" we use a more conservative grid and stronger regularisation.
+omega_min = 20.0
+omega_max = 180.0
+omega_num = 60
+
+# Model breakpoints (meV) for the default model m_n(ω)
+omega_I = 20.0
+omega_M = 120.0
+
+# MEM settings for parts="both" (extra conservative).
+# Goal: make the *sanity check* (vary=()) run without linear-algebra failures.
+mem = {
+    "parts": "both",
+    "h_n": 1e-3,               # must be set
+    "lambda_el": 0.0,
+    "impurity_magnitude": 0.0, # meV
+
+    # Strong damping / truncation
+    "mu": 1e5,
+    "sigma_svd": 5e-1,
+    "iter_max": 10000,
+
+    # Narrower alpha scan range to avoid extreme alphas
+    "alpha_min": 2.0,
+    "alpha_max": 4.0,
+    "alpha_num": 6,
+
+    # Safer energy window (meV): stay away from EF and deep binding energies
+    "ecut_left": 150.0,
+    "ecut_right": 40.0,
+}
+
+# 1) Sanity check without optimisation
+cost, a2f, model, alpha_select = self_energy.bayesian_loop(
+    omega_min=omega_min, omega_max=omega_max, omega_num=omega_num,
+    omega_I=omega_I, omega_M=omega_M,
+    fermi_velocity=self_energy.fermi_velocity,
+    fermi_wavevector=self_energy.fermi_wavevector,
+    vary=(),
+    mem=mem,
+)
+
+# 2) Enable optimisation only after the above line succeeds
+vary = ("h_n","impurity_magnitude")
+
+cost, a2f, model, alpha_select, params = self_energy.bayesian_loop(
+    omega_min=omega_min, omega_max=omega_max, omega_num=omega_num,
+    omega_I=omega_I, omega_M=omega_M,
+    fermi_velocity=self_energy.fermi_velocity,
+    fermi_wavevector=self_energy.fermi_wavevector,
+    vary=vary,
+    mem=mem,
+    opt_method="Nelder-Mead",
+    opt_options={"maxiter": 200},
+)
+
+omega = np.linspace(omega_min, omega_max, omega_num)
+
+fig = plt.figure(figsize=(7, 4))
+ax = fig.gca()
+ax.plot(omega, a2f, label=r"$\alpha^2F(\omega)$")
+ax.plot(omega, model, "--", label="Model")
+ax.set_xlabel("Energy (meV)")
+ax.set_ylabel("a2F (arb. units)")
+ax.set_title("Eliashberg function (MEM + Bayesian loop)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+
