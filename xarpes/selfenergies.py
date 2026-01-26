@@ -843,8 +843,10 @@ class SelfEnergy:
         - SpectralLinear: additionally "fermi_velocity"
         - SpectralQuadratic: additionally "bare_mass"
 
-        Convergence behaviour
-        ---------------------
+        Notes
+        -----
+        **Convergence behaviour**
+
         By default, convergence is controlled by a *custom patience criterion*:
         the optimization terminates when the absolute difference between the
         current cost and the best cost seen so far is smaller than `tole` for
@@ -857,11 +859,11 @@ class SelfEnergy:
 
         Parameters
         ----------
-        opt_options : dict (optional)
-            Dictionary of options passed directly to `scipy.optimize.minimize`.
-            These are only used for convergence if the custom criterion is
-            disabled (see above).
+        opt_options : dict, optional
+            Options passed directly to `scipy.optimize.minimize`. These are only
+            used for convergence if the custom criterion is disabled (see Notes).
         """
+
         fermi_velocity, fermi_wavevector, bare_mass = self._prepare_bare(
             fermi_velocity, fermi_wavevector, bare_mass)
         

@@ -20,22 +20,43 @@ from .constants import PREF
 
 class BandMap:
     r"""
-    Class for the band map from the ARPES experiment.
+    Band map container for ARPES intensity data.
 
-    Construction
-    ------------
-    Prefer the alternate constructors:
+    Notes
+    -----
+    Prefer :meth:`from_ibw_file` or :meth:`from_np_arrays`. The ``__init__``
+    expects canonical arrays (no file I/O).
 
-    - BandMap._from_ibw_file(path, ...)
-    - BandMap._from_np_arrays(intensities=..., angles=..., ekin=... or enel=...)
-
-    The __init__ takes *canonical* arrays (no file I/O).
+    See Also
+    --------
+    BandMap.from_ibw_file
+    BandMap.from_np_arrays
     """
 
     @classmethod
     def from_ibw_file(cls, datafile, transpose=False, flip_ekin=False,
                        flip_angles=False, **kwargs):
-        r"""Construct BandMap from an IGOR binary wave (.ibw)."""
+        r"""
+        Construct a `BandMap` from an IGOR binary wave (.ibw).
+
+        Parameters
+        ----------
+        datafile : path-like
+            Path to the .ibw file.
+        transpose : bool, optional
+            If True, transpose the loaded intensity array and swap axes metadata.
+        flip_ekin : bool, optional
+            If True, reverse the kinetic-energy axis.
+        flip_angles : bool, optional
+            If True, reverse the angle axis.
+        **kwargs
+            Passed to `BandMap.__init__`.
+
+        Returns
+        -------
+        BandMap
+            New instance constructed from the file contents.
+        """
         data = binarywave.load(datafile)
         intensities = data['wave']['wData']
 
@@ -66,7 +87,27 @@ class BandMap:
     @classmethod
     def from_np_arrays(cls, intensities=None, angles=None, ekin=None, enel=None,
                         **kwargs):
-        r"""Construct BandMap from NumPy arrays."""
+        r"""
+        Construct a `BandMap` from NumPy arrays.
+
+        Exactly one of `ekin` or `enel` must be provided.
+
+        Parameters
+        ----------
+        intensities : array-like
+            Intensity map with shape (n_energy, n_angle).
+        angles : array-like
+            Angle axis values.
+        ekin, enel : array-like
+            Provide exactly one: kinetic energy (`ekin`) or binding energy (`enel`).
+        **kwargs
+            Passed to `BandMap.__init__`.
+
+        Returns
+        -------
+        BandMap
+            New instance constructed from the provided arrays.
+        """
         if intensities is None or angles is None:
             raise ValueError('Please provide intensities and angles.')
         if (ekin is None) == (enel is None):
