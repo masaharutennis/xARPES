@@ -188,62 +188,33 @@ def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
 
 
 def fit_leastsq(p0, xdata, ydata, function, resolution=None, yerr=None,
-                bounds=None, *extra_args):
-    r"""Wrapper around SciPy least-squares solvers.
+                *extra_args, bounds=None):
+    r"""Least-squares fit using `scipy.optimize.least_squares`.
 
-    Uses `scipy.optimize.leastsq` if bounds is None (legacy behavior).
-    Uses `scipy.optimize.least_squares` if bounds is provided.
+    Default behavior is Levenberg–Marquardt (`method="lm"`) when unbounded.
+    If `bounds` is provided, switches to trust-region reflective (`"trf"`).
 
-    Parameters
-    ----------
-    bounds : 2-tuple of array_like, optional
-        Lower/upper bounds on parameters. Use -np.inf/np.inf for unbounded
-        entries. If provided, switches solver to `least_squares`.
+    Returns (pfit, pcov) in the same style as the old `leastsq` wrapper.
     """
-    from scipy.optimize import leastsq, least_squares
+    from scipy.optimize import least_squares
 
     if yerr is None:
         yerr = np.ones_like(ydata)
-
-    if bounds is None:
-        pfit, pcov, infodict, errmsg, success = leastsq(
-            error_function,
-            p0,
-            args=(xdata, ydata, function, resolution, yerr, extra_args),
-            full_output=1,
-        )
-
-        if (len(ydata) > len(p0)) and pcov is not None:
-            resid = error_function(
-                pfit, xdata, ydata, function, resolution, yerr, extra_args
-            )
-            s_sq = (resid ** 2).sum() / (len(ydata) - len(p0))
-            pcov *= s_sq
-        else:
-            pcov = np.inf
-
-        return pfit, pcov
-
-    # --- bounded variant via least_squares
-    lower, upper = bounds
 
     def _residuals(p):
         return error_function(
             p, xdata, ydata, function, resolution, yerr, extra_args
         )
 
-    res = least_squares(
-        _residuals,
-        p0,
-        bounds=(lower, upper),
-        method="trf",
-    )
+    if bounds is None:
+        res = least_squares(_residuals, p0, method="lm")
+    else:
+        res = least_squares(_residuals, p0, method="trf", bounds=bounds)
 
     pfit = res.x
 
-    # Covariance estimate from J^T J (scaled by residual variance)
     m = len(ydata)
-    n = len(p0)
+    n = pfit.size
 
     if (m > n) and res.jac is not None and res.jac.size:
         resid = res.fun
