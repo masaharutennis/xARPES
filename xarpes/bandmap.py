@@ -747,8 +747,9 @@ class BandMap:
         extra_args = (self.temperature,)
 
         popt, pcov = fit_least_squares(
-        parameters, energy_range, integrated_intensity, fdir_initial,
-        self.energy_resolution, None, None, *extra_args)
+            p0=parameters, xdata=energy_range, ydata=integrated_intensity,
+            function=fdir_initial, resolution=self.energy_resolution,
+            yerr=None, bounds=None, extra_args=extra_args)
 
         # Update hnuminPhi; automatically sets self.enel
         self.hnuminPhi = popt[0]
@@ -847,8 +848,9 @@ class BandMap:
             edge = Intensities[:, indx]
             
             parameters, pcov = fit_least_squares(
-            parameters, energy_range, edge, fdir_initial,
-            self.energy_resolution, None, None, *extra_args)
+                p0=parameters, xdata=energy_range, ydata=edge,
+                function=fdir_initial, resolution=self.energy_resolution,
+                yerr=None, bounds=None, extra_args=extra_args)
 
             nmps[indx] = parameters[0]
             stds[indx] = np.sqrt(np.diag(pcov)[0])
@@ -861,8 +863,9 @@ class BandMap:
         
         lin_fun = Linear(offset_guess, slope_guess, 'Linear')
                     
-        popt, pcov = fit_least_squares(parameters, angle_range, nmps, lin_fun, None,
-                                 stds)
+        popt, pcov = fit_least_squares(p0=parameters, xdata=angle_range, 
+                        ydata=nmps, function=lin_fun, resolution=None,
+                                 yerr=stds, bounds=None)
 
         linsp = lin_fun(angle_range, popt[0], popt[1])
 

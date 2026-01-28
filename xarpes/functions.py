@@ -148,7 +148,7 @@ def extend_function(abscissa_range, abscissa_resolution):
     return extend, step, numb
 
 
-def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
+def error_function(p, xdata, ydata, function, resolution, yerr, *extra_args):
     r"""The error function used inside the fit_least_squares function.
 
     Parameters
@@ -188,7 +188,7 @@ def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
 
 
 def fit_least_squares(p0, xdata, ydata, function, resolution=None, yerr=None,
-                *extra_args, bounds=None):
+                      bounds=None, extra_args=None):
     r"""Least-squares fit using `scipy.optimize.least_squares`.
 
     Default behavior is Levenberg–Marquardt (`method="lm"`) when unbounded.
@@ -201,9 +201,12 @@ def fit_least_squares(p0, xdata, ydata, function, resolution=None, yerr=None,
     if yerr is None:
         yerr = np.ones_like(ydata)
 
+    if extra_args is None:
+        extra_args = ()
+
     def _residuals(p):
         return error_function(
-            p, xdata, ydata, function, resolution, yerr, extra_args
+            p, xdata, ydata, function, resolution, yerr, *extra_args
         )
 
     if bounds is None:
@@ -229,6 +232,7 @@ def fit_least_squares(p0, xdata, ydata, function, resolution=None, yerr=None,
         pcov = np.inf
 
     return pfit, pcov
+
 
 
 def download_examples():
