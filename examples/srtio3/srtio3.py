@@ -217,48 +217,30 @@ self_six = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_left_6'
 self_five.plot_both()
 
 
-
-spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
-                                omega_M=100, omega_S=1.0, alpha_min=0.0,
+fig, spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
+                                omega_min=0.5, omega_max=120, omega_num=250, 
+                                omega_I=20, omega_M=100, omega_S=1.0, alpha_min=0.0,
                                 alpha_max=8.0, alpha_num=10, parts='both',
                                 ecut_left=3.0, h_n=0.0741008, impurity_magnitude=16.475007)
 
-spectrum_left, model, omega_range, alpha_select = self_five.extract_a2f(
-    omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
-                                omega_M=100, omega_S=1.0, alpha_min=0.0,
+fig, spectrum_left, model, omega_range, alpha_select = self_five.extract_a2f(
+                                omega_min=0.5, omega_max=120, omega_num=250, 
+                                omega_I=20, omega_M=100, omega_S=1.0, alpha_min=0.0,
                                 alpha_max=8.0, alpha_num=10, parts='both',
                                 ecut_left=3.0, h_n=0.0743720, impurity_magnitude=15.882396)
 
-omega_range = np.linspace(0.5, 120, 250)
-plt.figure(figsize=(7, 4))
-plt.xlim([-120, 0]); plt.ylim([0, 0.6])
-plt.xlabel(r'$\omega$ (meV)'); plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
-plt.plot(-omega_range, model, color='darkgoldenrod', linestyle='-.')
-plt.plot(-omega_range, spectrum, color='tab:blue', linewidth=2, label='Inner right', zorder=10)
-plt.plot(-omega_range, spectrum_left, color='tab:red', linewidth=2, label='Inner left')
-plt.legend(); plt.show()
-
-cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_min=0.5,
+spectrum, model, omega_range, alpha_select, cost, params = self_energy.bayesian_loop(omega_min=0.5,
             omega_max=120, omega_num=250, omega_I=20, omega_M=100, omega_S=1.0,
             alpha_min=0.0, alpha_max=8.0, alpha_num=10, method='chi2kink',
             parts='both', ecut_left=3, iter_max=1e4, t_criterion=1e-8,
-            power=4, bare_mass = 0.5939648580991967, fermi_wavevector = 0.14096599149347405,
-            h_n = 0.14453652120992496, impurity_magnitude = 16.472274264782957, lambda_el = 6.40542820041109e-07,
+            power=4, bare_mass=0.6094394681, fermi_wavevector=0.1420916364, h_n=0.07582382627, 
+            impurity_magnitude=14.64962434, lambda_el=2.064840668e-07,
             vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", 
                 "h_n"), scale_imp=1.0, scale_lambda_el=1.0, scale_kF=0.1, scale_mb=1.0, scale_hn=1.0)
 
-# Optimised parameters:
-#   fermi_velocity = 2.8590279150001967
-#   fermi_wavevector = 0.3580104700929503
-#   h_n = 0.13784830295580716
-#   impurity_magnitude = 120.90250207340154
-#   lambda_el = 2.4801500927868874e-08
 
-plt.figure(figsize=(9, 5))
-plt.xlim([0, 250]); plt.ylim([0, 0.5])
-# plt.xlabel(r'$\omega$ (meV)')
-plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
-plt.plot(spectrum[::-1])
+fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
+
+fig = self_energy.plot_spectra(ax=ax)
+
 plt.show()
-
-

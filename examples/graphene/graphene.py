@@ -151,9 +151,7 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
                 self_energies=self_energies)
 
 
-# fig
-
-spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
+fig, spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
         omega_min=0.5, omega_max=250, omega_num=250, omega_I=50, omega_M=200,
         omega_S=1, alpha_min=1.0, alpha_max=9.0, alpha_num=10, method="chi2kink", 
         parts="both", ecut_left=0.0, ecut_right=None, t_criterion=1e-8, 
@@ -161,14 +159,14 @@ spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
         impurity_magnitude=120.94606, power=4, f_chi_squared=None,
 )
 
-plt.figure(figsize=(9, 5))
-plt.xlim([0, 250]); plt.ylim([0, 0.5])
-plt.xlabel(r'$\omega$ (meV)')
-plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
-plt.plot(model); plt.plot(spectrum)
+
+fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
+
+fig = self_energy.plot_spectra(ax=ax)
+
 plt.show()
 
-cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_min=0.5,
+spectrum, model, omega_range, alpha_select, cost, params = self_energy.bayesian_loop(omega_min=0.5,
             omega_max=250, omega_num=250, omega_I=50, omega_M=200, omega_S=1.0,
             W=1500, power=4, fermi_velocity=2.8590436, fermi_wavevector=0.358010499,
             h_n=0.0802309738, impurity_magnitude=120.902261, lambda_el=0,
@@ -176,24 +174,8 @@ cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_mi
             converge_iters=10, tole=1e-2, scale_vF=1.0, scale_imp=1.0, scale_kF=0.1, 
             scale_lambda_el=1.0, scale_hn=10.0)
 
-# Add one example where instead, variables are used to update defaults
-# se.extract_a2f(..., mem={"omega_S": 2.0, "h_n": 0.12})
+# The following cell performs some testing on the electron-electron self-energy expressions
 
-# Optimised parameters:
-#   fermi_velocity = 2.8551771220199167
-#   fermi_wavevector = 0.3579972425409562
-#   h_n = 0.13705853207396188
-#   impurity_magnitude = 120.90008381886433
-#   lambda_el = 1.605219872448565e-07
-
-print(params); print(cost)
-
-plt.figure(figsize=(9, 5))
-plt.xlim([0, 250]); plt.ylim([0, 0.5])
-plt.xlabel(r'$\omega$ (meV)')
-plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
-plt.plot(spectrum[::-1])
-plt.show()
 
 temperature = 10
 k_BT = xarpes.K_B * temperature * xarpes.KILO
@@ -216,7 +198,6 @@ plt.plot(enel_range, re, label='real pt')
 plt.plot(enel_range,im, label='-imag pt')
 plt.legend()
 plt.show()
-
 
 
 angle_min2 = -1e6
@@ -242,13 +223,6 @@ fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
 
 self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_1',
 fermi_velocity=-2.67, fermi_wavevector=-0.354))
-
-spectrum, model = self_energy.extract_a2f(omega_min=0.5, omega_max=250, omega_num=250, omega_I=50,
-                                omega_M=200, omega_S=1, h_n=0.12, alpha_min=1.0,
-                                alpha_max=9.0, alpha_num=8, method='chi2kink',
-                                impurity_scattering=124.73815)
-
-
 
 
 fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
