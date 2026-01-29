@@ -32,7 +32,6 @@ bmap = xarpes.BandMap.from_np_arrays(intensities=intn, angles=angl, ekin=ekns,
         energy_resolution=0.0025, angle_resolution=0.1, temperature=10)
 
 
-
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
 fig = bmap.fit_fermi_edge(hnuminPhi_guess=30, background_guess=1e4,
@@ -65,6 +64,11 @@ fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 
 fig = mdcs.visualize_guess(distributions=guess_dists, energy_value=energy_value, ax=ax)
 
+# **Note on interactive figures**
+# - The interactive figure might not work inside the Jupyter notebooks, despite our best efforts to ensure stability.
+# - As a fallback, the user may switch from "%matplotlib widget" to "%matplotlib qt", after which the figure should pop up in an external window.
+# - For some package versions, a static version of the interactive widget may spuriously show up inside other cells. In that case, uncomment the #get_ipython()... line in the first cell for your notebooks.
+
 
 fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 
@@ -73,14 +77,10 @@ fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
-# bare_mass=1.602 | fermi_wavevector=0.2739
-
-# 1.5960309075, fermi_wavevector=0.250010325
-
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Right_branch_1', 
-                                bare_mass=1.5960309075, fermi_wavevector=0.250010325, side='right'))
+                                bare_mass=1.59675179, fermi_wavevector=0.2499758715, side='right'))
 
-fig = self_energy.plot_both(ax=ax)
+fig = self_energy.plot_both(ax=ax, scale='meV')
 
 plt.show()
 
@@ -93,28 +93,76 @@ fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy',
                 plot_dispersions='domain', 
                 self_energies=self_energies, ax=ax)
 
+# In the following cell, we extract the Eliashberg function from the self-energy. The result of the chi2kink fit is plotted during the extraction. Setting "show=False" and "fig_close=True" will prevent the figure from being displayed. Afterwards, the Eliashberg function and model function with the appropriate self-energy methods.
 
-spectrum, model = self_energy.extract_a2f(omega_min=1.0, omega_max=80, 
-        omega_num=250, omega_I=20, omega_M=60, alpha_min=1.5, alpha_num=10,
-        alpha_max=9.5, lambda_el=0.1132858, impurity_magnitude=10.041243,
-        h_n=0.0803366)
 
-plt.figure(figsize=(9, 5))
-plt.xlim([0, 250]); plt.ylim([0, 0.5])
-plt.xlabel(r'$\omega$ (meV)')
-plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
-plt.plot(model); plt.plot(spectrum)
+fig, spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
+    omega_min=1.0, omega_max=80, omega_num=250, omega_I=20, omega_M=60, 
+    alpha_min=1.5, alpha_num=10, alpha_max=9.5, lambda_el=0.1132858, 
+    impurity_magnitude=10.041243, h_n=0.0803366, show=True, fig_close=False)
+
+plt.show()
+
+
+fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
+
+fig = self_energy.plot_spectra(ax=ax)
+
+plt.show()
+
+# The following plots all of the extracted quantities in a single figure. The default plotting range is taken from the second plotting statement.
+# By default, The Eliashberg function is extracted while removing the self-energies for binding energies smaller than the energy resolution. In that case, it is transparent to also eliminate these self-energies from the displayed result.
+
+fig = plt.figure(figsize=(10, 8)); ax1 = fig.add_subplot(111); ax2 = ax1.twinx()
+
+ax1.set_ylim([0, 0.5]); ax2.set_ylim([0, 40])
+
+self_energy.plot_spectra( ax=ax1, abscissa="reversed", show=False, fig_close=False)
+self_energy.plot_both(ax=ax2, scale="meV", resolution_range='applied', show=False, fig_close=False)
+
+# --- spectra (ax1): last two lines
+a2f_line, model_line = ax1.get_lines()[-2:]
+a2f_line.set_color("mediumvioletred")
+model_line.set_color("darkgoldenrod"); model_line.set_linestyle("--")
+
+# --- self-energy lines (ax2): last two lines
+real_line, imag_line = ax2.get_lines()[-2:]
+real_line.set_color("tab:blue"); imag_line.set_color("tab:orange")
+
+# --- match error bar colors to line colors
+collections = ax2.collections
+
+# Convention: real errorbars were added before imag errorbars
+real_err, imag_err = collections[-2:]
+real_err.set_color(real_line.get_color()); imag_err.set_color(imag_line.get_color())
+
+# --- remove any pre-existing legends
+for ax in (ax1, ax2): ax.get_legend() and ax.get_legend().remove()
+
+# --- combined legend
+h1, l1 = ax1.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+ax1.legend(h1 + h2, l1 + l2, ncol=2)
+
 plt.show()
 
 # In the following cell, we start from the optimal solution. Unsurprisingly, the optimal solution is obtained after just a couple of iterations.
 
-cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_min=1.0,
+cost, spectrum, model, alpha_select = self_energy.bayesian_loop(omega_min=1.0,
             omega_max=80, omega_num=250, omega_I=20, omega_M=60,
             alpha_min=3.0, alpha_max=11.0, bare_mass=1.597636665, fermi_wavevector=0.2499774217, 
             h_n=0.081811739, impurity_magnitude=10.0379498, lambda_el=0.1054932517,
             vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
             scale_mb=0.01, scale_imp=0.1, scale_kF=0.001,
             scale_lambda_el=0.1, scale_hn=0.1)
+
+
+plt.figure(figsize=(9, 5))
+plt.xlim([0, 80]); plt.ylim([0, 0.5])
+plt.plot(omega_range, spectrum, color="mediumvioletred")
+plt.plot(omega_range, model, color="tab:blue")
+plt.xlabel(r'$\omega~$(meV)')
+plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
+plt.show()
 
 # In the following cell, we start from a much less probable solution, showing that
 
@@ -136,7 +184,7 @@ cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_mi
             omega_max=80, omega_num=250, omega_I=20, omega_M=60,
             alpha_min=1.0, alpha_max=9.0, sigma_svd=1e-4,
             bare_mass=1.597636093, fermi_wavevector=0.2499774208, 
-            h_n=0.08181151626, impurity_magnitude=10.03795642, lambda_el=0.1054945571,
+            h_n=0.08181151626, impurity_magnitude=10.03795642, lambdxa_el=0.1054945571,
             vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
             converge_iters=100, tole=1e-8, scale_mb=0.1, scale_imp=0.1, scale_kF=0.01,
             scale_lambda_el=0.1, scale_hn=0.1)

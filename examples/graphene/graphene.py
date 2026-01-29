@@ -151,7 +151,9 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax,
                 self_energies=self_energies)
 
 
-spectrum, model = self_energy.extract_a2f(
+# fig
+
+spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
         omega_min=0.5, omega_max=250, omega_num=250, omega_I=50, omega_M=200,
         omega_S=1, alpha_min=1.0, alpha_max=9.0, alpha_num=10, method="chi2kink", 
         parts="both", ecut_left=0.0, ecut_right=None, t_criterion=1e-8, 
@@ -165,8 +167,6 @@ plt.xlabel(r'$\omega$ (meV)')
 plt.ylabel(r'$\alpha^2F_n(\omega)~(-)$')
 plt.plot(model); plt.plot(spectrum)
 plt.show()
-
-print(max(spectrum))
 
 cost, spectrum, model, alpha_select, params = self_energy.bayesian_loop(omega_min=0.5,
             omega_max=250, omega_num=250, omega_I=50, omega_M=200, omega_S=1.0,

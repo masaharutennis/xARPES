@@ -217,12 +217,14 @@ self_six = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_left_6'
 self_five.plot_both()
 
 
-spectrum, model = self_energy.extract_a2f(omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
+
+spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
                                 omega_M=100, omega_S=1.0, alpha_min=0.0,
                                 alpha_max=8.0, alpha_num=10, parts='both',
                                 ecut_left=3.0, h_n=0.0741008, impurity_magnitude=16.475007)
 
-spectrum_left, _, = self_five.extract_a2f(omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
+spectrum_left, model, omega_range, alpha_select = self_five.extract_a2f(
+    omega_min=0.5, omega_max=120, omega_num=250, omega_I=20,
                                 omega_M=100, omega_S=1.0, alpha_min=0.0,
                                 alpha_max=8.0, alpha_num=10, parts='both',
                                 ecut_left=3.0, h_n=0.0743720, impurity_magnitude=15.882396)
