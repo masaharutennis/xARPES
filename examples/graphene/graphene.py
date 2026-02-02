@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 # # Intercalated graphene
-# In this example, we extract the self-energies and Eliashberg function of
-# intercalated graphene.
+# In this example, we extract the self-energies and Eliashberg function of Si-intercalated, Li-doped graphene.
 
 # Data have been provided with permission for re-use, originating from:
 # https://journals.aps.org/prb/abstract/10.1103/PhysRevB.97.085132
@@ -35,9 +34,7 @@ bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01,
 
 bmap.shift_angles(shift=-2.28)
 
-fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
-
-fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
+fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', size_kwargs=dict(w=6, h=5))
 
 
 # import numpy as np
@@ -51,9 +48,7 @@ fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
 
 # bmap.shift_angles(shift=-2.28)
 
-# fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
-
-# fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
+# fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', size_kwargs=dict(w=6, h=5))
 
 
 fig, ax = plt.subplots(2, 1, figsize=(6, 8))
@@ -79,12 +74,10 @@ print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
 # fig = bmap.plot(ordinate='kinetic_energy', abscissa='angle')
 
 
-fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
-
 fig = bmap.fit_fermi_edge(hnuminPhi_guess=32, background_guess=1e5,
                           integrated_weight_guess=1.5e6, angle_min=-10,
                           angle_max=10, ekin_min=31.96, ekin_max=32.08,
-                          ax=ax, show=True, fig_close=True, title='Fermi edge fit')
+                          show=True, title='Fermi edge fit')
 
 print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
       + f'{1.96 * bmap.hnuminPhi_std:.5f}' + ' eV.')
@@ -156,15 +149,12 @@ fig, spectrum, model, omega_range, alpha_select = self_energy.extract_a2f(
         omega_S=1, alpha_min=1.0, alpha_max=9.0, alpha_num=10, method="chi2kink", 
         parts="both", ecut_left=0.0, ecut_right=None, t_criterion=1e-8, 
         sigma_svd=1e-4, iter_max=1e4, lambda_el=0.0, W=1500, h_n=0.1062861,
-        impurity_magnitude=120.94606, power=4, f_chi_squared=None,
-)
+        impurity_magnitude=120.94606, power=4, f_chi_squared=None)
 
 
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
 fig = self_energy.plot_spectra(ax=ax)
-
-plt.show()
 
 spectrum, model, omega_range, alpha_select, cost, params = self_energy.bayesian_loop(omega_min=0.5,
             omega_max=250, omega_num=250, omega_I=50, omega_M=200, omega_S=1.0,
@@ -172,7 +162,8 @@ spectrum, model, omega_range, alpha_select, cost, params = self_energy.bayesian_
             h_n=0.0802309738, impurity_magnitude=120.902261, lambda_el=0,
              vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "fermi_velocity", "h_n"), 
             converge_iters=10, tole=1e-2, scale_vF=1.0, scale_imp=1.0, scale_kF=0.1, 
-            scale_lambda_el=1.0, scale_hn=10.0)
+            scale_lambda_el=1.0, scale_hn=10.0, 
+            print_lines=10)
 
 # The following cell performs some testing on the electron-electron self-energy expressions
 
@@ -245,6 +236,7 @@ ax.set_ylim([-0.025, 0.275])
 
 plt.legend(); plt.show()
 
+
 fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 
 self_left.plot_both(ax=ax, show=False, fig_close=False)
@@ -261,6 +253,5 @@ labels = [
 ]
 
 ax.legend([left_real, left_imag, right_real, right_imag], labels)
+
 plt.show()
-
-

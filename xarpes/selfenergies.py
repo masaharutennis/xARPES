@@ -1175,47 +1175,52 @@ class SelfEnergy:
         return fig, spectrum, model, omega_range, alpha_select
     
 
-    def bayesian_loop(self, *, omega_min, omega_max, omega_num, omega_I, 
-                    omega_M, fermi_velocity=None, 
-                    fermi_wavevector=None, bare_mass=None, vary=(),
-                    opt_method="Nelder-Mead", opt_options=None,
-                    mem=None, loop=None, **mem_kwargs):
+    def bayesian_loop(self, *, omega_min, omega_max, omega_num, omega_I, omega_M,
+                    fermi_velocity=None, fermi_wavevector=None, bare_mass=None,
+                    vary=(), opt_method="Nelder-Mead", opt_options=None,
+                    mem=None, loop=None, print_lines=None, **mem_kwargs):
         r"""
         Bayesian outer loop calling `_cost_function()`.
 
-        If `vary` is non-empty, runs a SciPy optimization over the selected
-        parameters in `vary`.
-
-        Supported entries in `vary` depend on `self._class`:
-
-        - Common: "fermi_wavevector", "impurity_magnitude", "lambda_el", "h_n"
-        - SpectralLinear: additionally "fermi_velocity"
-        - SpectralQuadratic: additionally "bare_mass"
-
-        Notes
-        -----
-        **Convergence behaviour**
-
-        By default, convergence is controlled by a *custom patience criterion*:
-        the optimization terminates when the absolute difference between the
-        current cost and the best cost seen so far is smaller than `tole` for
-        `converge_iters` consecutive iterations.
-
-        To instead rely on SciPy's native convergence criteria (e.g. Nelder–Mead
-        `xatol` / `fatol`), disable the custom criterion by setting
-        `converge_iters=0` or `tole=None`. In that case, SciPy termination options
-        supplied via `opt_options` are used.
-
         Parameters
         ----------
-        opt_options : dict, optional
-            Options passed directly to `scipy.optimize.minimize`. These are only
-            used for convergence if the custom criterion is disabled (see Notes).
+        print_lines : int or None, optional
+            If an integer, prints the first/last `print_lines` iteration lines.
+            If None, prints all lines as usual.
         """
+        return self._bayesian_loop_core(
+            omega_min=omega_min,
+            omega_max=omega_max,
+            omega_num=omega_num,
+            omega_I=omega_I,
+            omega_M=omega_M,
+            fermi_velocity=fermi_velocity,
+            fermi_wavevector=fermi_wavevector,
+            bare_mass=bare_mass,
+            vary=vary,
+            opt_method=opt_method,
+            opt_options=opt_options,
+            mem=mem,
+            loop=loop,
+            print_lines=print_lines,
+            **mem_kwargs,
+        )
+    
 
+    def _bayesian_loop_core(self, *, omega_min, omega_max, omega_num, omega_I,
+                            omega_M, fermi_velocity=None, fermi_wavevector=None,
+                            bare_mass=None, vary=(), opt_method="Nelder-Mead",
+                            opt_options=None, mem=None, loop=None,
+                            print_lines=None, **mem_kwargs):
+        r"""
+        Core implementation of `bayesian_loop` (prints controlled by print_lines).
+
+        See `bayesian_loop` for API documentation.
+        """
         fermi_velocity, fermi_wavevector, bare_mass = self._prepare_bare(
-            fermi_velocity, fermi_wavevector, bare_mass)
-        
+            fermi_velocity, fermi_wavevector, bare_mass
+        )
+
         vary = tuple(vary) if vary is not None else ()
 
         allowed = {"fermi_wavevector", "impurity_magnitude", "lambda_el", "h_n"}
@@ -1226,16 +1231,17 @@ class SelfEnergy:
             allowed.add("bare_mass")
         else:
             raise NotImplementedError(
-                f"bayesian_loop does not support spectral class '{self._class}'."
+                "bayesian_loop does not support spectral class "
+                f"'{self._class}'."
             )
-        
+
         unknown = set(vary).difference(allowed)
         if unknown:
             raise ValueError(
                 f"Unsupported entries in vary: {sorted(unknown)}. "
                 f"Allowed: {sorted(allowed)}."
             )
-                        
+
         omega_num = int(omega_num)
         if omega_num < 2:
             raise ValueError("omega_num must be an integer >= 2.")
@@ -1301,21 +1307,15 @@ class SelfEnergy:
                 f"Initial h_n ({h_n0:g}) must be >= h_n_min ({h_n_min:g})."
             )
         if kF0 is None:
-            raise ValueError(
-                "bayesian_loop requires an initial fermi_wavevector."
-                )
+            raise ValueError("bayesian_loop requires an initial fermi_wavevector.")
         if self._class == "SpectralLinear" and vF0 is None:
-            raise ValueError(
-                "bayesian_loop requires an initial fermi_velocity."
-                )
+            raise ValueError("bayesian_loop requires an initial fermi_velocity.")
         if self._class == "SpectralQuadratic" and mb0 is None:
             raise ValueError("bayesian_loop requires an initial bare_mass.")
-        
+
         from scipy.optimize import minimize
+        from collections import deque
         from . import create_kernel_function, singular_value_decomposition
-          
-        ecut_left = float(mem_cfg["ecut_left"])
-        ecut_right = mem_cfg["ecut_right"]
 
         ecut_left_eV = ecut_left / KILO
         if ecut_right is None:
@@ -1346,10 +1346,14 @@ class SelfEnergy:
             kernel_used = np.concatenate((np.real(kernel_raw), -np.imag(kernel_raw)))
         elif parts == "real":
             kernel_used = np.real(kernel_raw)
-        else:  # parts == "imag"
+        else:
             kernel_used = -np.imag(kernel_raw)
 
-        V_Sigma, U, uvec0 = singular_value_decomposition(kernel_used, sigma_svd)
+        # Try to silence SVD diagnostics during trimmed-output runs, if supported.
+        svd_verbose = (print_lines is None)
+        V_Sigma, U, uvec0 = singular_value_decomposition(
+            kernel_used, sigma_svd
+            )
 
         _precomp = {
             "omega_range": omega_range,
@@ -1361,43 +1365,47 @@ class SelfEnergy:
             "ecut_left": ecut_left,
             "ecut_right": ecut_right,
         }
-        
+
         def _reflect_min(xi, p0, p_min, scale):
             """Map R -> [p_min, +inf) using linear reflection around p_min."""
             return p_min + np.abs((float(p0) - p_min) + scale * float(xi))
 
         def _unpack_params(x):
             params = {}
-
             i = 0
             for name in vary:
                 xi = float(x[i])
 
                 if name == "fermi_velocity":
                     if vF0 is None:
-                        raise ValueError("Cannot vary fermi_velocity: no "
-                        "initial vF provided.")
+                        raise ValueError(
+                            "Cannot vary fermi_velocity: no initial vF provided."
+                        )
                     params["fermi_velocity"] = vF0 + scale_vF * xi
 
                 elif name == "bare_mass":
                     if mb0 is None:
-                        raise ValueError("Cannot vary bare_mass: no initial "
-                        "bare_mass provided.")
+                        raise ValueError(
+                            "Cannot vary bare_mass: no initial bare_mass provided."
+                        )
                     params["bare_mass"] = mb0 + scale_mb * xi
 
                 elif name == "fermi_wavevector":
                     if kF0 is None:
                         raise ValueError(
-                            "Cannot vary fermi_wavevector: no initial kF "
-                            "provided."
+                            "Cannot vary fermi_wavevector: no initial kF provided."
                         )
                     params["fermi_wavevector"] = kF0 + scale_kF * xi
-                    
+
                 elif name == "impurity_magnitude":
-                    params["impurity_magnitude"] = _reflect_min(xi, imp0, 0.0, scale_imp)
+                    params["impurity_magnitude"] = _reflect_min(
+                        xi, imp0, 0.0, scale_imp
+                    )
 
                 elif name == "lambda_el":
-                    params["lambda_el"] = _reflect_min(xi, lae0, 0.0, scale_lambda_el)
+                    params["lambda_el"] = _reflect_min(
+                        xi, lae0, 0.0, scale_lambda_el
+                    )
 
                 elif name == "h_n":
                     params["h_n"] = _reflect_min(xi, h_n0, h_n_min, scale_hn)
@@ -1435,14 +1443,14 @@ class SelfEnergy:
 
             return self._cost_function(
                 optimisation_parameters=optimisation_parameters,
-                omega_min=omega_min, omega_max=omega_max, omega_num=omega_num,
-                omega_I=omega_I, omega_M=omega_M, mem_cfg=mem_cfg, 
-                _precomp=_precomp
-                )
-
-        last = {"cost": None, "spectrum": None, "model": None, "alpha": None}
-
-        iter_counter = {"n": 0}
+                omega_min=omega_min,
+                omega_max=omega_max,
+                omega_num=omega_num,
+                omega_I=omega_I,
+                omega_M=omega_M,
+                mem_cfg=mem_cfg,
+                _precomp=_precomp,
+            )
 
         class ConvergenceException(RuntimeError):
             """Raised when optimisation has converged successfully."""
@@ -1461,7 +1469,6 @@ class SelfEnergy:
         if converge_iters < 0:
             raise ValueError("converge_iters must be >= 0.")
 
-        # Track best solution seen across all obj calls (not just last).
         best_global = {
             "x": None,
             "params": None,
@@ -1472,24 +1479,52 @@ class SelfEnergy:
         }
 
         history = []
-
-        # Cache most recent evaluation so the callback can read a cost without
-        # forcing an extra objective evaluation.
-        last_x = {"x": None}
         last_cost = {"cost": None}
         initial_cost = {"cost": None}
-
         iter_counter = {"n": 0}
 
         def _clean_params(params):
             """Convert NumPy scalar values to plain Python scalars."""
             out = {}
             for key, val in params.items():
-                if isinstance(val, np.generic):
-                    out[key] = float(val)
-                else:
-                    out[key] = val
+                out[key] = float(val) if isinstance(val, np.generic) else val
             return out
+
+        # --- Deterministic iteration printing (bulletproof) ---
+        if print_lines is None:
+            n_print = None
+        else:
+            n_print = int(print_lines)
+            if n_print < 0:
+                raise ValueError("print_lines must be >= 0 or None.")
+
+        tail_buf = deque(maxlen=0 if n_print is None else n_print)
+        omitted = {"n": 0}
+
+        def _emit_iter_line(line):
+            if n_print is None:
+                print(line)
+                return
+            if n_print == 0:
+                return
+            if iter_counter["n"] <= n_print:
+                print(line)
+            else:
+                tail_buf.append(line)
+                omitted["n"] += 1
+
+        def _flush_tail(clear=True):
+            if n_print is None or n_print == 0:
+                return
+
+            if omitted["n"] > 0:
+                print(f"... ({omitted['n']} lines omitted) ...")
+            for line in tail_buf:
+                print(line)
+
+            if clear:
+                tail_buf.clear()
+                omitted["n"] = 0
 
         def obj(x):
             import warnings
@@ -1503,7 +1538,10 @@ class SelfEnergy:
                 try:
                     cost, spectrum, model, alpha_select = _evaluate_cost(params)
                 except RuntimeWarning as exc:
-                    raise ValueError(f"RuntimeWarning during cost eval: {exc}") from exc
+                    raise ValueError(
+                        f"RuntimeWarning during cost eval: {exc}"
+                    ) from exc
+
             cost_f = float(cost)
 
             history.append(
@@ -1517,14 +1555,7 @@ class SelfEnergy:
                 }
             )
 
-            last["cost"] = cost_f
-            last["spectrum"] = spectrum
-            last["model"] = model
-            last["alpha"] = float(alpha_select)
-
-            last_x["x"] = np.array(x, dtype=float, copy=True)
             last_cost["cost"] = cost_f
-
             if initial_cost["cost"] is None:
                 initial_cost["cost"] = cost_f
 
@@ -1539,18 +1570,15 @@ class SelfEnergy:
             msg = [f"Iter {iter_counter['n']:4d} | cost = {cost: .4e}"]
             for key in sorted(params):
                 msg.append(f"{key}={params[key]:.8g}")
-            print(" | ".join(msg))
+            _emit_iter_line(" | ".join(msg))
 
             return cost_f
-        
+
         class TerminationCallback:
-            def __init__(self, tole, converge_iters,
-                         min_steps_for_regression):
+            def __init__(self, tole, converge_iters, min_steps_for_regression):
                 self.tole = None if tole is None else float(tole)
                 self.converge_iters = int(converge_iters)
-                self.min_steps_for_regression = int(
-                    min_steps_for_regression
-                )
+                self.min_steps_for_regression = int(min_steps_for_regression)
                 self.iter_count = 0
                 self.call_count = 0
 
@@ -1566,7 +1594,7 @@ class SelfEnergy:
 
                 best_cost = float(best_global["cost"])
                 if np.isfinite(best_cost):
-                    if abs(current - best_cost) < self.tole:
+                    if abs(float(current) - best_cost) < self.tole:
                         self.iter_count += 1
                     else:
                         self.iter_count = 0
@@ -1574,11 +1602,10 @@ class SelfEnergy:
                 if self.iter_count >= self.converge_iters:
                     raise ConvergenceException(
                         "Converged: |cost-best| < "
-                        f"{self.tole:g} for "
-                        f"{self.converge_iters} iterations."
+                        f"{self.tole:g} for {self.converge_iters} iterations."
                     )
 
-                if self.call_count < self.min_steps_for_regression:
+                if self.call_count < min_steps_for_regression:
                     return
 
                 init_cost = initial_cost["cost"]
@@ -1591,10 +1618,7 @@ class SelfEnergy:
                 if not np.isfinite(best_cost):
                     return
 
-                if (
-                    abs(current - init_cost) * relative_best
-                    < abs(current - best_cost)
-                ):
+                if abs(current - init_cost) * relative_best < abs(current - best_cost):
                     raise RegressionException(
                         "Regression toward initial guess detected."
                     )
@@ -1624,19 +1648,12 @@ class SelfEnergy:
         res = None
 
         while retry_count <= max_retries:
-            best = {
-                "x": None,
-                "params": None,
-                "cost": np.inf,
-                "spectrum": None,
-                "model": None,
-                "alpha": None,
-            }
-            last_x["x"] = None
             last_cost["cost"] = None
             initial_cost["cost"] = None
             iter_counter["n"] = 0
             history.clear()
+            tail_buf.clear()
+            omitted["n"] = 0
 
             callback = TerminationCallback(
                 tole=tole,
@@ -1660,6 +1677,7 @@ class SelfEnergy:
                 break
 
             except RegressionException as exc:
+                _flush_tail()
                 print(f"{exc} Rolling back {rollback_steps} steps.")
                 retry_count += 1
 
@@ -1671,6 +1689,7 @@ class SelfEnergy:
                 continue
 
             except ValueError as exc:
+                _flush_tail()
                 print(f"ValueError encountered: {exc}. Rolling back.")
                 retry_count += 1
 
@@ -1680,6 +1699,8 @@ class SelfEnergy:
                 back = min(int(rollback_steps), len(history))
                 x0 = np.array(history[-back]["x"], dtype=float, copy=True)
                 continue
+
+        _flush_tail()
 
         if retry_count > max_retries:
             print("Max retries reached. Parameters may not be optimal.")
@@ -1702,14 +1723,14 @@ class SelfEnergy:
         print("Optimised parameters:")
         print(args)
 
-        # store inside class methods
         self._a2f_spectrum = spectrum
         self._a2f_model = model
         self._a2f_omega_range = omega_range
         self._a2f_alpha_select = alpha_select
         self._a2f_cost = cost
 
-        return spectrum, model, omega_range, alpha_select, cost, params
+        return spectrum, model, omega_range, alpha_select, cost, params  
+
 
     @staticmethod
     def _merge_defaults(defaults, override_dict=None, override_kwargs=None):
@@ -2145,6 +2166,101 @@ class SelfEnergy:
         }
 
         return spectrum_out, alpha_select, fit_curve, guess_curve, chi2kink_result
+
+
+    @staticmethod
+    def _trimmed_stdout(print_lines):
+        """Optionally tee stdout+stderr and replace final output with head/tail."""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _ctx():
+            if print_lines is None:
+                yield
+                return
+
+            n = int(print_lines)
+            import sys
+            import io
+
+            class _Tee:
+                def __init__(self, out_stream, err_stream, nlines):
+                    self.out_stream = out_stream
+                    self.err_stream = err_stream
+                    self.nlines = int(nlines)
+                    self.buf = io.StringIO()
+
+                def write(self, text):
+                    # Jupyter sometimes calls write with empty strings
+                    if text is None:
+                        return
+                    if self.nlines > 0:
+                        self.out_stream.write(text)
+                        self.out_stream.flush()
+                    self.buf.write(text)
+
+                def flush(self):
+                    self.out_stream.flush()
+
+                def err_write(self, text):
+                    if text is None:
+                        return
+                    if self.nlines > 0:
+                        self.err_stream.write(text)
+                        self.err_stream.flush()
+                    self.buf.write(text)
+
+                def err_flush(self):
+                    self.err_stream.flush()
+
+                def cleaned(self):
+                    lines = self.buf.getvalue().splitlines()
+                    if self.nlines <= 0:
+                        return ""
+
+                    if len(lines) <= 2 * self.nlines:
+                        return "\n".join(lines)
+
+                    head = lines[:self.nlines]
+                    tail = lines[-self.nlines:]
+                    omitted = len(lines) - 2 * self.nlines
+                    mid = f"... ({omitted} lines omitted) ..."
+                    return "\n".join(head + [mid] + tail)
+
+            stdout_orig = sys.stdout
+            stderr_orig = sys.stderr
+
+            tee = _Tee(stdout_orig, stderr_orig, n)
+
+            class _ErrProxy:
+                def write(self, text):
+                    tee.err_write(text)
+
+                def flush(self):
+                    tee.err_flush()
+
+            try:
+                sys.stdout = tee
+                sys.stderr = _ErrProxy()
+                yield
+            finally:
+                sys.stdout = stdout_orig
+                sys.stderr = stderr_orig
+
+                try:
+                    from IPython.display import clear_output
+                    clear_output(wait=True)
+                except Exception:
+                    pass
+
+                cleaned = tee.cleaned()
+                if cleaned:
+                    print(cleaned)
+                else:
+                    # Avoid a "blank cell" surprise.
+                    print("(output trimmed; nothing captured from stdout/stderr)")
+
+        return _ctx()
 
 
     @staticmethod
