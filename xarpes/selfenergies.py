@@ -88,7 +88,7 @@ class SelfEnergy:
         self._a2f_spectrum = None
         self._a2f_model = None
         self._a2f_omega_range = None
-        self._a2f_alpha_select = None
+        self._a2f_aval_select = None
         self._a2f_cost = None
 
     def _check_mass_velocity_exclusivity(self):
@@ -372,9 +372,9 @@ class SelfEnergy:
         return self._a2f_omega_range
 
     @property
-    def a2f_alpha_select(self):
-        """Cached selected alpha from last extraction (or None)."""
-        return self._a2f_alpha_select
+    def a2f_aval_select(self):
+        """Cached selected a-value from last extraction (or None)."""
+        return self._a2f_aval_select
 
     @property
     def a2f_cost(self):
@@ -605,7 +605,7 @@ class SelfEnergy:
 
     @add_fig_kwargs
     def plot_real(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
-        r"""Plot the real part Σ' of the self-energy as a function of E-μ.
+        """Plot the real part Σ' of the self-energy as a function of E-μ.
 
         Parameters
         ----------
@@ -615,7 +615,7 @@ class SelfEnergy:
             Units for both axes. If "meV", x and y (and yerr) are multiplied by
             `KILO`.
         resolution_range : {"absent", "applied"}
-            If "applied", removes points with |E-μ| <= energy_resolution (around
+            If "applied", removes points with E-μ <= energy_resolution (around
             the chemical potential). The energy resolution is taken from
             ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
         **kwargs :
@@ -678,7 +678,7 @@ class SelfEnergy:
 
     @add_fig_kwargs
     def plot_imag(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
-        r"""Plot the imaginary part -Σ'' of the self-energy vs. E-μ.
+        """Plot the imaginary part -Σ'' of the self-energy vs. E-μ.
 
         Parameters
         ----------
@@ -688,7 +688,7 @@ class SelfEnergy:
             Units for both axes. If "meV", x and y (and yerr) are multiplied by
             `KILO`.
         resolution_range : {"absent", "applied"}
-            If "applied", removes points with |E-μ| <= energy_resolution (around
+            If "applied", removes points with E-μ <= energy_resolution (around
             the chemical potential). The energy resolution is taken from
             ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
         **kwargs :
@@ -751,7 +751,7 @@ class SelfEnergy:
 
     @add_fig_kwargs
     def plot_both(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
-        r"""Plot Σ'(E) and -Σ''(E) vs. E-μ on the same axis.
+        """Plot Σ'(E) and -Σ''(E) vs. E-μ on the same axis.
 
         Parameters
         ----------
@@ -761,7 +761,7 @@ class SelfEnergy:
             Units for both axes. If "meV", x, y, and yerr are multiplied by
             `KILO`.
         resolution_range : {"absent", "applied"}
-            If "applied", removes points with |E-μ| <= energy_resolution (around
+            If "applied", removes points with \-μ <= energy_resolution (around
             the chemical potential). The energy resolution is taken from
             ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
         **kwargs :
@@ -998,8 +998,8 @@ class SelfEnergy:
             MEM model spectrum.
         omega_range : ndarray
             ω grid used for the extraction.
-        alpha_select : float
-            Selected alpha returned by the chi2kink procedure.
+        aval_select : float
+            Selected a-value returned by the chi2kink procedure.
         """
         from . import settings_parameters as xprs
 
@@ -1011,9 +1011,9 @@ class SelfEnergy:
         method = mem_cfg["method"]
         parts = mem_cfg["parts"]
         iter_max = int(mem_cfg["iter_max"])
-        alpha_min = float(mem_cfg["alpha_min"])
-        alpha_max = float(mem_cfg["alpha_max"])
-        alpha_num = int(mem_cfg["alpha_num"])
+        aval_min = float(mem_cfg["aval_min"])
+        aval_max = float(mem_cfg["aval_max"])
+        aval_num = int(mem_cfg["aval_num"])
         ecut_left = float(mem_cfg["ecut_left"])
         ecut_right = mem_cfg["ecut_right"]
         omega_S = float(mem_cfg["omega_S"])
@@ -1021,7 +1021,7 @@ class SelfEnergy:
         sigma_svd = float(mem_cfg["sigma_svd"])
         t_criterion = float(mem_cfg["t_criterion"])
         mu = float(mem_cfg["mu"])
-        a_guess = float(mem_cfg["a_guess"])
+        g_guess = float(mem_cfg["g_guess"])
         b_guess = float(mem_cfg["b_guess"])
         c_guess = float(mem_cfg["c_guess"])
         d_guess = float(mem_cfg["d_guess"])
@@ -1124,10 +1124,10 @@ class SelfEnergy:
         V_Sigma, U, uvec = singular_value_decomposition(H, sigma_svd)
 
         if method == "chi2kink":
-            (spectrum_in, alpha_select, fit_curve, guess_curve,
+            (spectrum_in, aval_select, fit_curve, guess_curve,
             chi2kink_result) = self._chi2kink_a2f(
-                dvec, model_in, uvec, mu, wvec, V_Sigma, U, alpha_min,
-                alpha_max, alpha_num, a_guess, b_guess, c_guess, d_guess,
+                dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min,
+                aval_max, aval_num, g_guess, b_guess, c_guess, d_guess,
                 f_chi_squared, t_criterion, iter_max, MEM_core
             )
         else:
@@ -1136,12 +1136,12 @@ class SelfEnergy:
             )
 
         # --- Plot on ax: always raw chi2 + guess; add fit only if success ---
-        alpha_range = chi2kink_result["alpha_range"]
-        alpha0 = float(alpha_range[0])
-        x_plot = np.log10(alpha_range / alpha0)
+        aval_range = chi2kink_result["aval_range"]
+        aval0 = float(aval_range[0])
+        x_plot = np.log10(aval_range / aval0)
         y_chi2 = chi2kink_result["log_chi_squared"]
 
-        ax.set_xlabel(r"log$_{10}(\alpha)$ (-)")
+        ax.set_xlabel(r"log$_{10}(a)$ (-)")
         ax.set_ylabel(r"log$_{10}(\chi^2)$ (-)")
 
         ax.plot(x_plot, y_chi2, label="data")
@@ -1150,9 +1150,9 @@ class SelfEnergy:
         if chi2kink_result["success"]:
             ax.plot(x_plot, fit_curve, label="fit")
             ax.axvline(
-                np.log10(alpha_select / alpha0),
+                np.log10(aval_select / aval0),
                 linestyle="--",
-                label=r"$\alpha_{\rm sel}$",
+                label=r"$a_{\rm sel}$",
             )
         ax.legend()
 
@@ -1163,16 +1163,16 @@ class SelfEnergy:
                 "plotting chi2 and guess."
             )
 
-        # From here on, we know spectrum_in and alpha_select exist
+        # From here on, we know spectrum_in and aval_select exist
         spectrum = spectrum_in * omega_num / omega_max
 
         self._a2f_spectrum = spectrum
         self._a2f_model = model
         self._a2f_omega_range = omega_range
-        self._a2f_alpha_select = alpha_select
+        self._a2f_aval_select = aval_select
         self._a2f_cost = None
 
-        return fig, spectrum, model, omega_range, alpha_select
+        return fig, spectrum, model, omega_range, aval_select
     
 
     def bayesian_loop(self, *, omega_min, omega_max, omega_num, omega_I, 
@@ -1440,7 +1440,7 @@ class SelfEnergy:
                 _precomp=_precomp
                 )
 
-        last = {"cost": None, "spectrum": None, "model": None, "alpha": None}
+        last = {"cost": None, "spectrum": None, "model": None, "aval": None}
 
         iter_counter = {"n": 0}
 
@@ -1468,7 +1468,7 @@ class SelfEnergy:
             "cost": np.inf,
             "spectrum": None,
             "model": None,
-            "alpha": None,
+            "aval": None,
         }
 
         history = []
@@ -1501,7 +1501,7 @@ class SelfEnergy:
             with warnings.catch_warnings():
                 warnings.simplefilter("error", RuntimeWarning)
                 try:
-                    cost, spectrum, model, alpha_select = _evaluate_cost(params)
+                    cost, spectrum, model, aval_select = _evaluate_cost(params)
                 except RuntimeWarning as exc:
                     raise ValueError(f"RuntimeWarning during cost eval: {exc}") from exc
             cost_f = float(cost)
@@ -1513,14 +1513,14 @@ class SelfEnergy:
                     "cost": cost_f,
                     "spectrum": spectrum,
                     "model": model,
-                    "alpha": float(alpha_select),
+                    "aval": float(aval_select),
                 }
             )
 
             last["cost"] = cost_f
             last["spectrum"] = spectrum
             last["model"] = model
-            last["alpha"] = float(alpha_select)
+            last["aval"] = float(aval_select)
 
             last_x["x"] = np.array(x, dtype=float, copy=True)
             last_cost["cost"] = cost_f
@@ -1534,7 +1534,7 @@ class SelfEnergy:
                 best_global["params"] = _clean_params(params)
                 best_global["spectrum"] = spectrum
                 best_global["model"] = model
-                best_global["alpha"] = float(alpha_select)
+                best_global["aval"] = float(aval_select)
 
             msg = [f"Iter {iter_counter['n']:4d} | cost = {cost: .4e}"]
             for key in sorted(params):
@@ -1607,8 +1607,8 @@ class SelfEnergy:
 
         if not vary:
             params = _unpack_params(np.zeros(0, dtype=float))
-            cost, spectrum, model, alpha_select = _evaluate_cost(params)
-            return cost, spectrum, model, alpha_select
+            cost, spectrum, model, aval_select = _evaluate_cost(params)
+            return cost, spectrum, model, aval_select
 
         x0 = np.zeros(len(vary), dtype=float)
 
@@ -1630,7 +1630,7 @@ class SelfEnergy:
                 "cost": np.inf,
                 "spectrum": None,
                 "model": None,
-                "alpha": None,
+                "aval": None,
             }
             last_x["x"] = None
             last_cost["cost"] = None
@@ -1686,13 +1686,13 @@ class SelfEnergy:
 
         if best_global["params"] is None:
             params = _unpack_params(x0)
-            cost, spectrum, model, alpha_select = _evaluate_cost(params)
+            cost, spectrum, model, aval_select = _evaluate_cost(params)
         else:
             params = best_global["params"]
             cost = best_global["cost"]
             spectrum = best_global["spectrum"]
             model = best_global["model"]
-            alpha_select = best_global["alpha"]
+            aval_select = best_global["aval"]
 
         args = ", ".join(
             f"{key}={params[key]:.10g}" if isinstance(params[key], float)
@@ -1706,10 +1706,10 @@ class SelfEnergy:
         self._a2f_spectrum = spectrum
         self._a2f_model = model
         self._a2f_omega_range = omega_range
-        self._a2f_alpha_select = alpha_select
+        self._a2f_aval_select = aval_select
         self._a2f_cost = cost
 
-        return spectrum, model, omega_range, alpha_select, cost, params
+        return spectrum, model, omega_range, aval_select, cost, params
 
 
     @staticmethod
@@ -1796,6 +1796,7 @@ class SelfEnergy:
             raise NotImplementedError(
             f"_prepare_bare is not implemented for spectral class "
             "'{self._class}'.")
+        
 
     def _cost_function(self, *, optimisation_parameters, omega_min, omega_max,
                     omega_num, omega_I, omega_M, mem_cfg, _precomp):
@@ -1817,13 +1818,13 @@ class SelfEnergy:
         Returns
         -------
         cost : float
-            Negative log-posterior evaluated at the selected alpha.
+            Negative log-posterior evaluated at the selected a-value.
         spectrum : ndarray
             Rescaled α²F(ω) spectrum (same scaling convention as `extract_a2f()`).
         model : ndarray
             The model spectrum used by MEM (same as `extract_a2f()`).
-        alpha_select : float
-            The selected alpha returned by `_chi2kink_a2f`.
+        aval_select : float
+            The selected a-value returned by `_chi2kink_a2f`.
         """
 
         required = {"h_n", "impurity_magnitude", "lambda_el"}
@@ -1835,13 +1836,13 @@ class SelfEnergy:
         
         parts = mem_cfg["parts"]
         method = mem_cfg["method"]
-        alpha_min = float(mem_cfg["alpha_min"])
-        alpha_max = float(mem_cfg["alpha_max"])
-        alpha_num = int(mem_cfg["alpha_num"])
+        aval_min = float(mem_cfg["aval_min"])
+        aval_max = float(mem_cfg["aval_max"])
+        aval_num = int(mem_cfg["aval_num"])
         omega_S = float(mem_cfg["omega_S"])
 
         mu = float(mem_cfg["mu"])
-        a_guess = float(mem_cfg["a_guess"])
+        g_guess = float(mem_cfg["g_guess"])
         b_guess = float(mem_cfg["b_guess"])
         c_guess = float(mem_cfg["c_guess"])
         d_guess = float(mem_cfg["d_guess"])
@@ -1987,10 +1988,10 @@ class SelfEnergy:
             dvec = imag_m
             wvec = imag_sig_m**(-2)
 
-        (spectrum_in, alpha_select, fit_curve, guess_curve,
+        (spectrum_in, aval_select, fit_curve, guess_curve,
             chi2kink_result) = self._chi2kink_a2f(
-            dvec, model_in, uvec, mu, wvec, V_Sigma, U, alpha_min, alpha_max,
-            alpha_num, a_guess, b_guess, c_guess, d_guess, f_chi_squared,
+            dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min, aval_max,
+            aval_num, g_guess, b_guess, c_guess, d_guess, f_chi_squared,
             t_criterion, iter_max, MEM_core,
         )
 
@@ -2013,22 +2014,22 @@ class SelfEnergy:
         )
 
         cost = (0.5 * chi_squared
-            - alpha_select * information_entropy
+            - aval_select * information_entropy
             + 0.5 * np.sum(np.log(2.0 * np.pi / wvec))
-            - 0.5 * spectrum_in.size * np.log(alpha_select))
+            - 0.5 * spectrum_in.size * np.log(aval_select))
 
         spectrum = spectrum_in * omega_num / omega_max
 
-        return (cost, spectrum, model, alpha_select)
+        return (cost, spectrum, model, aval_select)
 
 
     @staticmethod
-    def _chi2kink_a2f(dvec, model_in, uvec, mu, wvec, V_Sigma, U, alpha_min,
-                    alpha_max, alpha_num, a_guess, b_guess, c_guess, d_guess,
+    def _chi2kink_a2f(dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min,
+                    aval_max, aval_num, g_guess, b_guess, c_guess, d_guess,
                     f_chi_squared, t_criterion, iter_max, MEM_core, *,
                     plot=None):
         r"""
-        Compute MEM spectrum using the chi2-kink alpha-selection procedure.
+        Compute MEM spectrum using the chi2-kink aval-selection procedure.
 
         Notes
         -----
@@ -2039,7 +2040,7 @@ class SelfEnergy:
         - lack of meaningful parameter updates relative to the initial guess,
         - absence of improvement in the residual sum of squares,
         - numerical instabilities or overflows in the logistic model,
-        - invalid or non-finite alpha selection.
+        - invalid or non-finite aval selection.
 
         Despite these safeguards, it is **not possible to guarantee** that all
         failure modes are detected in a nonlinear least-squares problem.
@@ -2047,18 +2048,18 @@ class SelfEnergy:
         but *not sufficient* condition for physical or numerical reliability.
 
         Callers **must** inspect the returned ``success`` flag (contained in
-        ``chi2kink_result``) before using the fitted curve, selected alpha, or
+        ``chi2kink_result``) before using the fitted curve, selected aval, or
         MEM spectrum. When ``success`` is False, the returned quantities are
         limited to those required for diagnostic plotting only.
         """
         from . import fit_least_squares, chi2kink_logistic
 
-        alpha_range = np.logspace(alpha_min, alpha_max, int(alpha_num))
-        chi_squared = np.empty_like(alpha_range, dtype=float)
+        aval_range = np.logspace(aval_min, aval_max, int(aval_num))
+        chi_squared = np.empty_like(aval_range, dtype=float)
 
-        for i, alpha in enumerate(alpha_range):
+        for i, aval in enumerate(aval_range):
             spectrum_in, uvec = MEM_core(
-                dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
+                dvec, model_in, uvec, mu, aval, wvec, V_Sigma, U,
                 t_criterion, iter_max
             )
             T = V_Sigma @ (U.T @ spectrum_in)
@@ -2069,16 +2070,16 @@ class SelfEnergy:
                 "chi_squared contains non-finite or non-positive values."
             )
 
-        log_alpha = np.log10(alpha_range)
+        log_aval = np.log10(aval_range)
         log_chi_squared = np.log10(chi_squared)
 
-        p0 = np.array([a_guess, b_guess, c_guess, d_guess], dtype=float)
+        p0 = np.array([g_guess, b_guess, c_guess, d_guess], dtype=float)
         pfit, pcov, lsq_success = fit_least_squares(
-            p0, log_alpha, log_chi_squared, chi2kink_logistic
+            p0, log_aval, log_chi_squared, chi2kink_logistic
         )
 
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-            guess_curve = chi2kink_logistic(log_alpha, *p0)
+            guess_curve = chi2kink_logistic(log_aval, *p0)
 
         # Start from the necessary requirement: least_squares must say success
         success = bool(lsq_success)
@@ -2096,7 +2097,7 @@ class SelfEnergy:
             else:
                 with np.errstate(over="ignore", invalid="ignore",
                                  divide="ignore"):
-                    fit_curve_tmp = chi2kink_logistic(log_alpha, *pfit)
+                    fit_curve_tmp = chi2kink_logistic(log_aval, *pfit)
 
                 if not np.all(np.isfinite(fit_curve_tmp)):
                     success = False
@@ -2110,7 +2111,7 @@ class SelfEnergy:
                     if (not np.isfinite(sse1)) or (sse1 >= sse0 - tol):
                         success = False
 
-        alpha_select = None
+        aval_select = None
         fit_curve = None
         spectrum_out = None
 
@@ -2126,26 +2127,26 @@ class SelfEnergy:
                 fit_curve = None
             else:
                 with np.errstate(over="raise", invalid="raise"):
-                    alpha_select = float(np.power(10.0, exp10))
+                    aval_select = float(np.power(10.0, exp10))
 
                 spectrum_out, uvec = MEM_core(
-                    dvec, model_in, uvec, mu, alpha_select, wvec, V_Sigma, U,
+                    dvec, model_in, uvec, mu, aval_select, wvec, V_Sigma, U,
                     t_criterion, iter_max
                 )
 
         chi2kink_result = {
-            "alpha_range": alpha_range,
+            "aval_range": aval_range,
             "chi_squared": chi_squared,
-            "log_alpha": log_alpha,
+            "log_aval": log_aval,
             "log_chi_squared": log_chi_squared,
             "p0": p0,
             "pfit": pfit,
             "pcov": pcov,
             "success": bool(success),
-            "alpha_select": alpha_select,
+            "aval_select": aval_select,
         }
 
-        return spectrum_out, alpha_select, fit_curve, guess_curve, chi2kink_result
+        return spectrum_out, aval_select, fit_curve, guess_curve, chi2kink_result
 
 
     @staticmethod

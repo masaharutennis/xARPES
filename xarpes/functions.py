@@ -389,18 +389,18 @@ def set_script_dir():
     return script_dir
 
 
-def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
+def MEM_core(dvec, model_in, uvec, mu, aval, wvec, V_Sigma, U,
              t_criterion, iter_max):
     r"""
     Implementation of Bryan's algorithm (not to be confused with Bryan's
-    'method' for determining the Lagrange multiplier alpha. For details, see
+    'method' for determining the Lagrange multiplier aval. For details, see
     Eur. Biophys. J. 18, 165 (1990).
     """
     import numpy as np
     import warnings
 
     spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
-    alphamu = alpha + mu
+    avalmu = aval + mu
 
     converged = False
     iter_count = 0
@@ -419,20 +419,20 @@ def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
         Y_inv = R.T @ (sqrt_xi[:, None] * P.T)  # Below Eq. 15
 
         # From Eq. 16:
-        Y_inv_du = -(Y_inv @ (alpha * uvec + gvec)) / (alphamu + Lambda)
+        Y_inv_du = -(Y_inv @ (aval * uvec + gvec)) / (avalmu + Lambda)
         d_uvec = (
-            -alpha * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
-        ) / alphamu  # Eq. 20
+            -aval * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
+        ) / avalmu  # Eq. 20
 
         uvec += d_uvec
         spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
 
         # Convergence block: Section 2.3
-        alpha_K_u = alpha * (K @ uvec)  # Skipping the minus sign twice
+        aval_K_u = aval * (K @ uvec)  # Skipping the minus sign twice
         K_g = K @ gvec
         tcon = (
-            2 * np.linalg.norm(alpha_K_u + K_g)**2
-            / (np.linalg.norm(alpha_K_u) + np.linalg.norm(K_g))**2
+            2 * np.linalg.norm(aval_K_u + K_g)**2
+            / (np.linalg.norm(aval_K_u) + np.linalg.norm(K_g))**2
         )
         converged = (tcon < t_criterion)
 

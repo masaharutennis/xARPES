@@ -29,15 +29,15 @@ def parameter_settings(new_sigma_extend=None, new_sigma=None):
     if new_sigma is not None:
         sigma_confidence = float(new_sigma)
 
-# ---------------- Defaults for MEM / chi2kink alpha-selection ----------------
+# ---------------- Defaults for MEM / chi2kink a-value-selection ----------------
 
 mem_defaults = {
     "method": "chi2kink",
     "parts": "both",
     "iter_max": 1e4,
-    "alpha_min": 1.0,
-    "alpha_max": 9.0,
-    "alpha_num": 10,
+    "aval_min": 1.0,
+    "aval_max": 9.0,
+    "aval_num": 10,
     "ecut_left": 0.0,
     "ecut_right": None,
     "f_chi_squared": None,
@@ -47,7 +47,7 @@ mem_defaults = {
     "omega_S": 1.0,
     "sigma_svd": 1e-4,
     "t_criterion": 1e-8,
-    "a_guess": 1.0,
+    "g_guess": 1.0,
     "b_guess": 2.5,
     "c_guess": 3.0,
     "d_guess": 1.5,

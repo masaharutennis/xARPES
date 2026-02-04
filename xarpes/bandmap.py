@@ -19,13 +19,24 @@ from .distributions import FermiDirac, Linear
 from .constants import PREF
 
 class BandMap:
-    r"""
+    """
     Band map container for ARPES intensity data.
+
+    A `BandMap` stores a two-dimensional ARPES intensity map together with
+    its angular axis and a single energy axis (either kinetic or binding
+    energy). Conversion between kinetic and binding energy is handled
+    internally via the work-function offset ``hnuminPhi`` when available.
 
     Notes
     -----
-    Prefer :meth:`from_ibw_file` or :meth:`from_np_arrays`. The ``__init__``
-    expects canonical arrays (no file I/O).
+    Users are encouraged to construct instances via
+    :meth:`from_ibw_file` or :meth:`from_np_arrays`. The ``__init__``
+    method expects fully initialized, canonical NumPy arrays and performs
+    no file I/O.
+
+    The intensity array is assumed to have shape
+    ``(n_energy, n_angle)``, consistent with all downstream operations
+    (plotting, MDC extraction, Fermi-edge fitting).
 
     See Also
     --------
@@ -36,26 +47,38 @@ class BandMap:
     @classmethod
     def from_ibw_file(cls, datafile, transpose=False, flip_ekin=False,
                        flip_angles=False, **kwargs):
-        r"""
-        Construct a `BandMap` from an IGOR binary wave (.ibw).
+        """
+        Construct a `BandMap` from an IGOR Binary Wave (``.ibw``) file.
+
+        The IGOR wave header is used to reconstruct the angular and
+        kinetic-energy axes. The resulting instance uses kinetic energy
+        (`ekin`) as the explicit energy axis.
 
         Parameters
         ----------
         datafile : path-like
-            Path to the .ibw file.
+            Path to the ``.ibw`` file.
         transpose : bool, optional
-            If True, transpose the loaded intensity array and swap axes metadata.
+            If True, transpose the loaded intensity array and swap the
+            associated axis metadata accordingly.
         flip_ekin : bool, optional
-            If True, reverse the kinetic-energy axis.
+            If True, reverse the kinetic-energy axis (first dimension).
         flip_angles : bool, optional
-            If True, reverse the angle axis.
+            If True, reverse the angle axis (second dimension).
         **kwargs
-            Passed to `BandMap.__init__`.
+            Additional keyword arguments forwarded to
+            :class:`BandMap.__init__`.
 
         Returns
         -------
         BandMap
             New instance constructed from the file contents.
+
+        Raises
+        ------
+        ValueError
+            If the dimensions reported in the file header do not match
+            the shape of the stored intensity array.
         """
         data = binarywave.load(datafile)
         intensities = data['wave']['wData']
@@ -82,31 +105,43 @@ class BandMap:
         angles = np.linspace(amin, amin + (anum - 1) * astp, anum)
         ekin = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
 
-        return cls(intensities=intensities, angles=angles, ekin=ekin, **kwargs)
+        return cls(intensities=intensities, angles=angles, ekin=ekin, 
+                   **kwargs)
 
     @classmethod
-    def from_np_arrays(cls, intensities=None, angles=None, ekin=None, enel=None,
-                        **kwargs):
-        r"""
-        Construct a `BandMap` from NumPy arrays.
+    def from_np_arrays(cls, intensities=None, angles=None, ekin=None, 
+                       enel=None, **kwargs):
+        """
+        Construct a `BandMap` directly from NumPy arrays.
 
-        Exactly one of `ekin` or `enel` must be provided.
+        Exactly one of `ekin` or `enel` must be provided and will become the
+        authoritative energy axis. The other energy axis may be derived
+        later if the work-function offset ``hnuminPhi`` is known.
 
         Parameters
         ----------
         intensities : array-like
-            Intensity map with shape (n_energy, n_angle).
+            ARPES intensity map with shape ``(n_energy, n_angle)`` [counts].
         angles : array-like
-            Angle axis values.
-        ekin, enel : array-like
-            Provide exactly one: kinetic energy (`ekin`) or binding energy (`enel`).
+            Angular axis values with shape ``(n_angle,)`` [degree].
+        ekin : array-like, optional
+            Kinetic-energy axis values with shape ``(n_energy,)`` [eV].
+        enel : array-like, optional
+            Binding-energy axis values with shape ``(n_energy,)`` [eV].
         **kwargs
-            Passed to `BandMap.__init__`.
+            Additional keyword arguments forwarded to
+            :class:`BandMap.__init__`.
 
         Returns
         -------
         BandMap
             New instance constructed from the provided arrays.
+
+        Raises
+        ------
+        ValueError
+            If `intensities` or `angles` is missing, or if both (or neither)
+            of `ekin` and `enel` are provided.
         """
         if intensities is None or angles is None:
             raise ValueError('Please provide intensities and angles.')
@@ -116,8 +151,66 @@ class BandMap:
                    **kwargs)
 
     def __init__(self, intensities=None, angles=None, ekin=None, enel=None,
-                 energy_resolution=None, angle_resolution=None, temperature=None,
-                 hnuminPhi=None, hnuminPhi_std=None):
+                 energy_resolution=None, angle_resolution=None,
+                 temperature=None, hnuminPhi=None, hnuminPhi_std=None):
+        """
+        Initialize a `BandMap` from canonical arrays and metadata.
+
+        A `BandMap` represents a two-dimensional ARPES intensity map defined on
+        an angular axis and a single authoritative energy axis. Exactly one of
+        `ekin` (kinetic energy) or `enel` (binding energy) must be provided.
+        The non-authoritative energy axis may be derived automatically when the
+        work-function offset ``hnuminPhi = h\\nu - \\Phi`` has been set with
+        the Fermi-edge fitting.
+
+        Parameters
+        ----------
+        intensities : array-like
+            ARPES intensity map with shape ``(n_energy, n_angle)`` [counts].
+        angles : array-like
+            Angular axis values with shape ``(n_angle,)`` [degree].
+        ekin : array-like, optional
+            Kinetic-energy axis values with shape ``(n_energy,)`` [eV]. If 
+            provided, `ekin` becomes the authoritative energy axis.
+        enel : array-like, optional
+            Binding-energy axis values with shape ``(n_energy,)`` [eV]. If 
+            provided, `enel` becomes the authoritative energy axis.
+        energy_resolution : float, optional
+            Energy resolution of the measurement, [eV].
+        angle_resolution : float, optional
+            Angular resolution of the measurement [degree].
+        temperature : float, optional
+            Sample temperature [K].
+        hnuminPhi : float, optional
+            Photon energy minus the work function, ``h\\nu - \\Phi`` [eV]. When
+            provided, this value is used to convert between kinetic and binding
+            energy via ``enel = ekin - hnuminPhi``.
+        hnuminPhi_std : float, optional
+            One-sigma standard deviation of `hnuminPhi` [eV].
+
+        Notes
+        -----
+        Exactly one of `ekin` or `enel` must be provided at initialization.
+        Attempting to set both (or neither) raises a `ValueError`.
+
+        The energy axis provided at initialization becomes *authoritative*.
+        After initialization:
+        - If `ekin` is authoritative, setting `enel` raises an
+          `AttributeError`.
+        - If `enel` is authoritative, setting `ekin` raises an
+          `AttributeError`.
+        - Updating `hnuminPhi` updates the non-authoritative energy axis when
+          possible.
+
+        No copying or validation of array shapes is performed beyond basic
+        presence checks; consistency of dimensions is assumed.
+
+        Raises
+        ------
+        ValueError
+            If required arrays are missing, or if both (or neither) of `ekin`
+            and `enel` are provided.
+        """
 
         # --- Required arrays ------------------------------------------------
         if intensities is None:
@@ -140,8 +233,6 @@ class BandMap:
             self._ekin = ekin
         elif enel is not None:
             self._enel = enel
-        elif file_ekin is not None:
-            self._ekin = file_ekin
         else:
             raise ValueError('Please provide datafile, ekin, or enel.')
 
@@ -157,8 +248,7 @@ class BandMap:
         self.hnuminPhi_std = hnuminPhi_std
 
         # --- 1) Track which axis is authoritative --------------------------
-        self._ekin_explicit = ekin is not None or (file_ekin is not None
-                                                   and enel is None)
+        self._ekin_explicit = ekin is not None
         self._enel_explicit = enel is not None
 
         # --- 2) Derive missing axis if possible ----------------------------
@@ -377,7 +467,7 @@ class BandMap:
             mdcs = self.intensities[energy_index,
                    angle_min_index:angle_max_index + 1]
 
-        if energy_range:
+        if energy_range is not None:
             energy_indices = np.where((self.enel >= np.min(energy_range))
                                       & (self.enel <= np.max(energy_range))) \
                                         [0]
@@ -746,7 +836,7 @@ class BandMap:
 
         extra_args = (self.temperature,)
 
-        popt, pcov, success = fit_least_squares(
+        popt, pcov, _ = fit_least_squares(
             p0=parameters, xdata=energy_range, ydata=integrated_intensity,
             function=fdir_initial, resolution=self.energy_resolution,
             yerr=None, bounds=None, extra_args=extra_args)
@@ -790,7 +880,7 @@ class BandMap:
                        slope_guess=0, offset_guess=None,
                            true_angle=0, ax=None, **kwargs):
         r"""TBD
-        hnuminPhi_guess should be estimate at true angle
+        hnuminPhi_guess should be estimated at true angle
 
         Parameters
         ----------
@@ -847,7 +937,7 @@ class BandMap:
         for indx in range(angle_max_index - angle_min_index + 1):
             edge = Intensities[:, indx]
             
-            parameters, pcov, success = fit_least_squares(
+            parameters, pcov, _ = fit_least_squares(
                 p0=parameters, xdata=energy_range, ydata=edge,
                 function=fdir_initial, resolution=self.energy_resolution,
                 yerr=None, bounds=None, extra_args=extra_args)
@@ -863,7 +953,7 @@ class BandMap:
         
         lin_fun = Linear(offset_guess, slope_guess, 'Linear')
                     
-        popt, pcov, success = fit_least_squares(p0=parameters, xdata=angle_range, 
+        popt, pcov, _ = fit_least_squares(p0=parameters, xdata=angle_range, 
                         ydata=nmps, function=lin_fun, resolution=None,
                                  yerr=stds, bounds=None)
 
