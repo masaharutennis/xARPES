@@ -22,7 +22,7 @@ xarpes.plot_settings('default')
 script_dir = xarpes.set_script_dir()
 
 dfld = 'data_sets'    # Folder containing the data
-flnm = 'csro_152' # Name of the file
+flnm = 'csro_xarpes_demo' # Name of the file
 extn = '.ibw'         # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
@@ -33,11 +33,11 @@ data_file_path = os.path.join(script_dir, dfld, flnm + extn)
 bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01, 
         angle_resolution=0.1, temperature=50)
 
-bmap.shift_angles(shift=-2.28)
+# bmap.shift_angles(shift=-2.28)
 
 fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
 
-fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
+fig = bmap.plot(abscissa='angle', ordinate='kinetic_energy', ax=ax)
 
 
 # import numpy as np
@@ -59,9 +59,9 @@ fig = bmap.plot(abscissa='momentum', ordinate='kinetic_energy', ax=ax)
 fig, ax = plt.subplots(2, 1, figsize=(6, 8))
 
 bmap.correct_fermi_edge(
-      hnuminPhi_guess=32, background_guess=1e2,
-      integrated_weight_guess=1e3, angle_min=-10, angle_max=10,
-      ekin_min=31.96, ekin_max=32.1, true_angle=0,
+      hnuminPhi_guess=52.25, background_guess=500,
+      integrated_weight_guess=3e5, angle_min=-20, angle_max=20,
+      ekin_min=52.20, ekin_max=52.3, true_angle=0,
       ax=ax[0], show=False, fig_close=False)
 
 bmap.plot(ordinate='electron_energy', abscissa='momentum',
@@ -82,27 +82,27 @@ print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
 fig = plt.figure(figsize=(6, 5))
 ax = fig.gca()
 
-fig = bmap.fit_fermi_edge(hnuminPhi_guess=32, background_guess=1e5,
-                          integrated_weight_guess=1.5e6, angle_min=-10,
-                          angle_max=10, ekin_min=31.96, ekin_max=32.1,
+fig = bmap.fit_fermi_edge(hnuminPhi_guess=52.25, background_guess=500,
+                          integrated_weight_guess=3e5, angle_min=-20,
+                          angle_max=20, ekin_min=52.2, ekin_max=52.3,
                           ax=ax, show=True, fig_close=True, title='Fermi edge fit')
 
 print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
       + f'{1.96 * bmap.hnuminPhi_std:.5f}' + ' eV.')
 
 
-angle_min = 0
-angle_max = 1e6
+angle_min = 5
+angle_max = 20
 
-energy_range = [-0.25, 0.01]
-energy_value = 0
+energy_range = [-0.2, 0.01]
+energy_value = -0.05
 
 mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
 guess_dists = xarpes.CreateDistributions([
-xarpes.Linear(offset=3.0e3, slope=-100),
-xarpes.SpectralLinear(amplitude=420, peak=7.3, broadening=0.012,
-                      name='Linear_test', index='1')
+xarpes.Linear(offset=4.0e2, slope=10),
+xarpes.SpectralLinear(amplitude=40, peak=12, broadening=0.025,
+                      name='Linear', index='1')
 ])
 
 fig = plt.figure(figsize=(8, 6))
@@ -129,8 +129,8 @@ plt.rcParams['lines.markersize'] = 0.8
 fig = plt.figure(figsize=(8, 6))
 ax = fig.gca()
 
-self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_test_1',
-                                fermi_velocity=2.85, fermi_wavevector=0.358))
+self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Linear_1',
+                                fermi_velocity=-3, fermi_wavevector=0.69))
 
 self_energies = xarpes.CreateSelfEnergies([self_energy])
 
@@ -147,30 +147,32 @@ fig = self_energy.plot_real(ax=ax)
 xarpes.parameter_settings(new_sigma=2)
 
 
-angle_min2 = -1e6
-angle_max2 = 0
+angle_min2 = -10
+angle_max2 = 5
 
 plt.rcParams['lines.markersize'] = 3.0
 
 mdc2 = xarpes.MDCs(*bmap.mdc_set(angle_min2, angle_max2, energy_range=energy_range))
 
 guess_dists2 = xarpes.CreateDistributions([
-xarpes.Linear(offset=2.0e3, slope=100),
-xarpes.SpectralLinear(amplitude=450, peak=-7.25, broadening=0.01,
+xarpes.Linear(offset=4.4e2, slope=3),
+xarpes.SpectralLinear(amplitude=18, peak=0, broadening=0.025,
                       name='Linear_left', index='1'),
 ])
 
 fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 
-fig = mdc2.visualize_guess(distributions=guess_dists2, energy_value=0, ax=ax)
+fig = mdc2.visualize_guess(distributions=guess_dists2, energy_value=energy_value, ax=ax)
 
-# Fit without showing output
 
-fig = mdc2.fit_selection(distributions=guess_dists2, show=False, fig_close=True)
+fig = plt.figure(figsize=(8, 6))
+ax = fig.gca()
+
+fig = mdc2.fit_selection(distributions=guess_dists2, ax=ax)
+
 
 self_left = xarpes.SelfEnergy(*mdc2.expose_parameters(select_label='Linear_left_1',
-fermi_velocity=-2.67, fermi_wavevector=-0.354))
-
+fermi_velocity=2, fermi_wavevector=0.03))
 
 fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
 
@@ -188,7 +190,7 @@ self_left.plot_both(ax=ax, show=False, fig_close=False)
 self_energy.plot_both(ax=ax, show=False, fig_close=False)
 
 ax.set_xlim([-0.275, 0.025])
-ax.set_ylim([-0.025, 0.275])
+ax.set_ylim([-0.025, 1.0])
 
 plt.legend(); plt.show()
 
@@ -197,7 +199,7 @@ fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
 self_left.plot_both(ax=ax, show=False, fig_close=False)
 self_energy.plot_both(ax=ax, show=False, fig_close=False)
 
-ax.set_xlim([-0.275, 0.025]); ax.set_ylim([-0.025, 0.275])
+ax.set_xlim([-0.275, 0.025]); ax.set_ylim([-0.025, 1.0])
 
 # Replace labels with custom labels
 left_real, left_imag, right_real, right_imag = ax.get_lines()

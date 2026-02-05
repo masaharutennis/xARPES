@@ -34,8 +34,31 @@ class BandMap:
 
     @classmethod
     def from_ibw_file(cls, datafile, transpose=False, flip_ekin=False,
-                       flip_angles=False, **kwargs):
-        r"""Construct BandMap from an IGOR binary wave (.ibw)."""
+                       flip_angles=False, energy_type='ekin', **kwargs):
+        r"""Construct BandMap from an IGOR binary wave (.ibw).
+        
+        Parameters
+        ----------
+        datafile : str
+            Path to the .ibw file.
+        transpose : bool, optional
+            Transpose the intensity matrix. Default is False.
+        flip_ekin : bool, optional
+            Flip the energy axis. Default is False.
+        flip_angles : bool, optional
+            Flip the angle axis. Default is False.
+        energy_type : str, optional
+            Type of energy axis in the file: 'ekin' for kinetic energy
+            or 'enel' for electron energy (binding energy). 
+            Default is 'ekin'.
+        **kwargs
+            Additional arguments passed to BandMap constructor.
+            
+        Returns
+        -------
+        BandMap
+            BandMap instance constructed from the IBW file.
+        """
         data = binarywave.load(datafile)
         intensities = data['wave']['wData']
 
@@ -59,9 +82,14 @@ class BandMap:
             intensities = intensities[:, ::-1]
 
         angles = np.linspace(amin, amin + (anum - 1) * astp, anum)
-        ekin = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
+        energy = np.linspace(fmin, fmin + (fnum - 1) * fstp, fnum)
 
-        return cls(intensities=intensities, angles=angles, ekin=ekin, **kwargs)
+        if energy_type == 'ekin':
+            return cls(intensities=intensities, angles=angles, ekin=energy, **kwargs)
+        elif energy_type == 'enel':
+            return cls(intensities=intensities, angles=angles, enel=energy, **kwargs)
+        else:
+            raise ValueError(f"energy_type must be 'ekin' or 'enel', got '{energy_type}'")
 
     @classmethod
     def from_np_arrays(cls, intensities=None, angles=None, ekin=None, enel=None,
@@ -91,7 +119,7 @@ class BandMap:
         self._ekin = None
         self._enel = None
 
-        # Apply user overrides or file ekin
+        # Apply user overrides
         if ekin is not None and enel is not None:
             raise ValueError('Provide only one of ekin or enel, not both.')
 
@@ -99,10 +127,8 @@ class BandMap:
             self._ekin = ekin
         elif enel is not None:
             self._enel = enel
-        elif file_ekin is not None:
-            self._ekin = file_ekin
         else:
-            raise ValueError('Please provide datafile, ekin, or enel.')
+            raise ValueError('Please provide ekin or enel.')
 
         # Scalars / metadata
         self.energy_resolution = energy_resolution
@@ -116,8 +142,7 @@ class BandMap:
         self.hnuminPhi_std = hnuminPhi_std
 
         # --- 1) Track which axis is authoritative --------------------------
-        self._ekin_explicit = ekin is not None or (file_ekin is not None
-                                                   and enel is None)
+        self._ekin_explicit = ekin is not None
         self._enel_explicit = enel is not None
 
         # --- 2) Derive missing axis if possible ----------------------------
@@ -409,26 +434,55 @@ class BandMap:
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
-        Angl, Ekin = np.meshgrid(self.angles, self.ekin)
+        # Create meshgrid based on available energy axis
+        Angl = None
+        Ekin = None
+        Enel = None
+        
+        if ordinate == 'kinetic_energy':
+            if self.ekin is None:
+                raise ValueError(
+                    'Kinetic energy axis not available. '
+                    'Either load data with energy_type="ekin" or set hnuminPhi.'
+                )
+            Angl, Ekin = np.meshgrid(self.angles, self.ekin)
+        elif ordinate == 'electron_energy':
+            if self.enel is None:
+                raise ValueError(
+                    'Electron energy axis not available. '
+                    'Either load data with energy_type="enel" or set hnuminPhi.'
+                )
+            Angl, Enel = np.meshgrid(self.angles, self.enel)
 
         if abscissa == 'angle':
-            ax.set_xlabel('Angle ($\\degree$)')
+            ax.set_xlabel(r'Angle ($\degree$)')
             if ordinate == 'kinetic_energy':
                 mesh = ax.pcolormesh(
                     Angl, Ekin, self.intensities,
                     shading='auto',
                     cmap=plt.get_cmap('bone').reversed())
-                ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
+                ax.set_ylabel(r'$E_{\mathrm{kin}}$ (eV)')
             elif ordinate == 'electron_energy':
-                Enel = Ekin - self.hnuminPhi
                 mesh = ax.pcolormesh(
                     Angl, Enel, self.intensities,
                     shading='auto',
                     cmap=plt.get_cmap('bone').reversed())
-                ax.set_ylabel('$E-\\mu$ (eV)')
+                ax.set_ylabel(r'$E-\mu$ (eV)')
 
         elif abscissa == 'momentum':
             ax.set_xlabel(r'$k_{//}$ ($\mathrm{\AA}^{-1}$)')
+            
+            # Momentum conversion requires Ekin
+            if Ekin is None:
+                if self.ekin is not None:
+                    Angl_temp, Ekin = np.meshgrid(self.angles, self.ekin)
+                else:
+                    raise ValueError(
+                        'Momentum conversion requires kinetic energy axis. '
+                        'Please set hnuminPhi to enable momentum conversion.'
+                    )
+            else:
+                Angl_temp = Angl
 
             with warnings.catch_warnings(record=True) as wlist:
                 warnings.filterwarnings(
@@ -441,7 +495,7 @@ class BandMap:
                     category=UserWarning,
                 )
 
-                Mome = np.sqrt(Ekin / PREF) * np.sin(np.deg2rad(Angl))
+                Mome = np.sqrt(Ekin / PREF) * np.sin(np.deg2rad(Angl_temp))
                 mome_min = np.min(Mome)
                 mome_max = np.max(Mome)
                 full_disp_momenta = np.linspace(
@@ -453,14 +507,15 @@ class BandMap:
                         Mome, Ekin, self.intensities,
                         shading='auto',
                         cmap=plt.get_cmap('bone').reversed())
-                    ax.set_ylabel('$E_{\\mathrm{kin}}$ (eV)')
+                    ax.set_ylabel(r'$E_{\mathrm{kin}}$ (eV)')
                 elif ordinate == 'electron_energy':
-                    Enel = Ekin - self.hnuminPhi
+                    if Enel is None:
+                        Enel = Ekin - self.hnuminPhi
                     mesh = ax.pcolormesh(
                         Mome, Enel, self.intensities,
                         shading='auto',
                         cmap=plt.get_cmap('bone').reversed())
-                    ax.set_ylabel('$E-\\mu$ (eV)')
+                    ax.set_ylabel(r'$E-\mu$ (eV)')
 
                 y_lims = ax.get_ylim()
 
@@ -834,8 +889,8 @@ class BandMap:
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
         
-        ax.set_xlabel('Angle ($\degree$)')
-        ax.set_ylabel('$E_{\mathrm{kin}}$ (eV)')
+        ax.set_xlabel(r'Angle ($\degree$)')
+        ax.set_ylabel(r'$E_{\mathrm{kin}}$ (eV)')
         mesh = ax.pcolormesh(Angl, Ekin, self.intensities,
                        shading='auto', cmap=plt.get_cmap('bone').reversed(),
                              zorder=1)
@@ -854,3 +909,236 @@ class BandMap:
                 [row_coords, col_coords], order=1)
                                   
         return fig
+
+
+    @add_fig_kwargs
+    def verify_fermi_edge(self, integrated_weight_guess=1.0, 
+                         angle_min=-np.inf, angle_max=np.inf, 
+                         enel_min=-0.1, enel_max=0.1,
+                         true_angle=0, hnuminPhi=None, ax=None, **kwargs):
+        r"""Verify Fermi edge position in already-calibrated data.
+        
+        This function is designed for data where enel axis is already calibrated
+        (Fermi level at ~0 eV). It fits Fermi-Dirac distributions to verify
+        the calibration accuracy and detect any residual angle-dependent shifts.
+        
+        Parameters
+        ----------
+        integrated_weight_guess : float, optional
+            Initial guess for the integrated weight of Fermi-Dirac function.
+            Default is 1.0.
+        angle_min : float, optional
+            Minimum angle for the analysis [degrees]. Default is -inf.
+        angle_max : float, optional
+            Maximum angle for the analysis [degrees]. Default is +inf.
+        enel_min : float, optional
+            Minimum electron energy (relative to Fermi level) [eV].
+            Default is -0.1 eV.
+        enel_max : float, optional
+            Maximum electron energy (relative to Fermi level) [eV].
+            Default is 0.1 eV.
+        true_angle : float, optional
+            Reference angle for reporting the Fermi level position [degrees].
+            Default is 0.
+        hnuminPhi : float, optional
+            Photon energy minus work function [eV]. If provided, enables
+            momentum conversion for plotting. Does NOT update self.hnuminPhi.
+            Default is None.
+        ax : matplotlib.axes.Axes, optional
+            Axes object to plot on. If None, creates new figure.
+            
+        Other parameters
+        ----------------
+        **kwargs : dict, optional
+            Additional arguments passed on to add_fig_kwargs.
+            
+        Returns
+        -------
+        fig : Matplotlib-Figure
+            Figure showing the Fermi edge positions across angles.
+        fermi_info : dict
+            Dictionary containing:
+            - 'angle_range': angles where Fermi edge was fitted
+            - 'fermi_levels': detected Fermi level positions [eV]
+            - 'fermi_stds': standard deviations of the fits [eV]
+            - 'slope': angle-dependent slope [eV/degree]
+            - 'offset': offset at angle=0 [eV]
+            - 'fermi_at_true_angle': Fermi position at true_angle [eV]
+            - 'calibration_quality': 'good' if |fermi| < 0.01 eV, else 'needs_adjustment'
+        
+        Notes
+        -----
+        Unlike correct_fermi_edge(), this function:
+        - Uses enel (electron energy) instead of ekin (kinetic energy)
+        - Does NOT update self.hnuminPhi (even if hnuminPhi parameter is provided)
+        - Does NOT modify self.intensities
+        - Returns quantitative information about calibration quality
+        - Optional hnuminPhi parameter allows momentum conversion without
+          permanently modifying the BandMap instance
+        
+        """
+        from scipy.ndimage import map_coordinates
+        from . import settings_parameters as xprs
+        
+        # Temporarily set hnuminPhi if provided (for momentum conversion)
+        original_hnuminPhi = self._hnuminPhi
+        if hnuminPhi is not None:
+            self._hnuminPhi = hnuminPhi
+        
+        # Get angle indices
+        angle_min_index = np.abs(self.angles - angle_min).argmin()
+        angle_max_index = np.abs(self.angles - angle_max).argmin()
+        
+        # Get energy indices using enel instead of ekin
+        if self.enel is None:
+            raise ValueError(
+                'enel axis is not available. '
+                'Either load data with energy_type="enel" or provide hnuminPhi parameter.'
+            )
+        
+        enel_min_index = np.abs(self.enel - enel_min).argmin()
+        enel_max_index = np.abs(self.enel - enel_max).argmin()
+
+        Intensities = self.intensities[enel_min_index:enel_max_index + 1,
+                                       angle_min_index:angle_max_index + 1]
+        angle_range = self.angles[angle_min_index:angle_max_index + 1]
+        energy_range = self.enel[enel_min_index:enel_max_index + 1]
+        
+        # Check if energy_range has sufficient points
+        if len(energy_range) < 2:
+            raise ValueError(
+                f'Insufficient energy points in range [{enel_min}, {enel_max}] eV. '
+                f'Found only {len(energy_range)} point(s). '
+                f'Please widen enel_min and enel_max range.'
+            )
+        
+        fermi_levels = np.zeros_like(angle_range, dtype=float)
+        stds = np.zeros_like(angle_range, dtype=float)
+        
+        # For calibrated data, Fermi level should be near 0 eV
+        # We fit for the exact position (offset from 0)
+        fermi_guess = 0.0
+        background_guess = 0.0  # Minimal background for clean Fermi edge
+        
+        # Create initial Fermi-Dirac function
+        # Note: hnuminPhi here represents the Fermi level position in enel coordinates
+        fdir_initial = FermiDirac(temperature=self.temperature,
+                      hnuminPhi=fermi_guess,
+                      background=background_guess,
+                      integrated_weight=integrated_weight_guess,
+                      name='Initial guess')
+        
+        # Parameters: [fermi_position, background, integrated_weight]
+        parameters = np.array([fermi_guess, background_guess, integrated_weight_guess])
+        
+        extra_args = (self.temperature,)
+
+        # Fit Fermi edge at each angle
+        for indx in range(angle_max_index - angle_min_index + 1):
+            edge = Intensities[:, indx]
+            
+            try:
+                parameters, pcov = fit_leastsq(
+                    parameters, energy_range, edge, fdir_initial,
+                    self.energy_resolution, None, *extra_args)
+                
+                fermi_levels[indx] = parameters[0]
+                stds[indx] = np.sqrt(np.diag(pcov)[0])
+            except Exception as e:
+                print(f"Warning: Fit failed at angle {angle_range[indx]:.2f}°: {e}")
+                fermi_levels[indx] = np.nan
+                stds[indx] = np.nan
+        
+        # Fit linear function to detect angle-dependent shifts
+        # Remove any NaN values before fitting
+        valid_mask = ~np.isnan(fermi_levels)
+        angle_range_valid = angle_range[valid_mask]
+        fermi_levels_valid = fermi_levels[valid_mask]
+        stds_valid = stds[valid_mask]
+        
+        if len(angle_range_valid) < 2:
+            raise ValueError('Too few successful fits to determine angle dependence.')
+        
+        # Initial guesses for linear fit
+        offset_guess = np.mean(fermi_levels_valid)
+        slope_guess = 0.0  # Should be ~0 for well-calibrated data
+        
+        parameters = np.array([offset_guess, slope_guess])
+        
+        lin_fun = Linear(offset_guess, slope_guess, 'Linear')
+                    
+        popt, pcov = fit_leastsq(parameters, angle_range_valid, fermi_levels_valid, 
+                                 lin_fun, None, stds_valid)
+
+        linsp = lin_fun(angle_range, popt[0], popt[1])
+        
+        # Calculate Fermi position at true_angle
+        fermi_at_true_angle = lin_fun(true_angle, popt[0], popt[1])
+        fermi_at_true_angle_std = np.sqrt(true_angle**2 * pcov[1, 1] + pcov[0, 0] 
+                                     + 2 * true_angle * pcov[0, 1])
+        
+        # Create visualization
+        Angl, Enel = np.meshgrid(self.angles, self.enel)
+
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+        
+        ax.set_xlabel(r'Angle ($\degree$)')
+        ax.set_ylabel(r'$E - \mu$ (eV)')
+        mesh = ax.pcolormesh(Angl, Enel, self.intensities,
+                       shading='auto', cmap=plt.get_cmap('bone').reversed(),
+                             zorder=1)
+
+        ax.errorbar(angle_range, fermi_levels, yerr=xprs.sigma_confidence * stds, 
+                    fmt='o', label='Detected Fermi level', zorder=3)
+        ax.plot(angle_range, linsp, 'r-', 
+                label=f'Linear fit: slope={popt[1]*1000:.2f} meV/deg', zorder=2)
+        ax.axhline(y=0, color='g', linestyle='--', alpha=0.5, 
+                   label='Expected Fermi level (0 eV)', zorder=2)
+        
+        ax.legend()
+        cbar = plt.colorbar(mesh, ax=ax, label='counts (-)')
+        
+        # Set y-axis limits to focus on Fermi edge region
+        ax.set_ylim([enel_min, enel_max])
+        
+        # Assess calibration quality
+        abs_fermi_shift = np.abs(fermi_at_true_angle)
+        if abs_fermi_shift < 0.01:  # Less than 10 meV
+            calibration_quality = 'good'
+        elif abs_fermi_shift < 0.05:  # Less than 50 meV
+            calibration_quality = 'acceptable'
+        else:
+            calibration_quality = 'needs_adjustment'
+        
+        # Prepare return dictionary
+        fermi_info = {
+            'angle_range': angle_range,
+            'fermi_levels': fermi_levels,
+            'fermi_stds': stds,
+            'slope': popt[1],
+            'slope_std': np.sqrt(pcov[1, 1]),
+            'offset': popt[0],
+            'offset_std': np.sqrt(pcov[0, 0]),
+            'fermi_at_true_angle': fermi_at_true_angle,
+            'fermi_at_true_angle_std': fermi_at_true_angle_std,
+            'calibration_quality': calibration_quality
+        }
+        
+        # Print summary
+        print(f"\n{'='*60}")
+        print(f"Fermi Edge Verification Results")
+        print(f"{'='*60}")
+        print(f"Fermi level at {true_angle}°: {fermi_at_true_angle*1000:.2f} ± "
+              f"{fermi_at_true_angle_std*1000:.2f} meV")
+        print(f"Angle-dependent slope: {popt[1]*1000:.2f} ± "
+              f"{np.sqrt(pcov[1, 1])*1000:.2f} meV/degree")
+        print(f"Calibration quality: {calibration_quality.upper()}")
+        if calibration_quality != 'good':
+            print(f"\nNote: Fermi level is shifted by {abs_fermi_shift*1000:.1f} meV.")
+            print(f"      Consider recalibration if high precision is required.")
+        print(f"{'='*60}\n")
+        
+        # Restore original hnuminPhi (does NOT update self.hnuminPhi permanently)
+        self._hnuminPhi = original_hnuminPhi
+        
+        return fig, fermi_info
