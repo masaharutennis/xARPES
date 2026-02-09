@@ -14,9 +14,7 @@ jupyter:
 
 # SrTiO<sub>3</sub>
 
-In this example, we extract the self-energies and Eliashberg function from  
-a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of  
-$\rm{SrTiO}_3$.
+In this example, we extract the self-energies and Eliashberg function from a 2DEL in the $d_{xy}$ bands on the $\rm{TiO}_{2}$-terminated surface of $\rm{SrTiO}_3$.
 
 ```{python}
 # %load_ext autoreload
@@ -133,7 +131,7 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
                          matrix_args=mat_args, ax=ax)
 ```
 
-**Note on interactive figures**
+**Note on the self-energy assignment**
 - The user has to explicitly assign the peaks as left-hand or right-hand side.  
 - In theory, one could incorporate such information in a minus sign of the peak position.  
 - However, this would also require setting boundaries for the fitting range.  
@@ -141,7 +139,7 @@ fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el,
 
 ```{python}
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_band_1', 
-                                bare_mass=0.6, fermi_wavevector=0.142, side='right'))
+                                bare_mass=0.58997502, fermi_wavevector=0.1411192, side='right'))
 
 self_two = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_band_2',
                                 bare_mass=0.6, fermi_wavevector=0.207))
@@ -225,4 +223,100 @@ self_total = xarpes.CreateSelfEnergies([
 
 fig = bmap.plot(abscissa='momentum', ordinate='electron_energy', ax=ax, 
                 self_energies=self_total, plot_dispersions='domain')
+```
+
+```{python}
+# %matplotlib inline
+
+guess_dists = xarpes.CreateDistributions([
+xarpes.Constant(offset=600),
+xarpes.SpectralQuadratic(amplitude=3600, peak=-2.45, broadening=0.00024,
+            center_wavevector=k_0, name='Inner_left', index='5'),
+xarpes.SpectralQuadratic(amplitude=1800, peak=-3.6, broadening=0.0004,
+            center_wavevector=k_0, name='Outer_left', index='6')
+])
+
+mat_el = lambda x: np.sin(np.deg2rad(x - theta_0)) ** 2
+
+mat_args = {}
+
+energy_range = [-0.1, 0.003]
+angle_min=-5.0
+angle_max=0.0
+
+
+mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
+
+fig = plt.figure(figsize=(7, 5)); ax = fig.gca()
+
+fig = mdcs.visualize_guess(distributions=guess_dists, matrix_element=mat_el,
+                           matrix_args=mat_args, energy_value=0.000, ax=ax)
+```
+
+```{python}
+# %matplotlib widget    
+
+fig = plt.figure(figsize=(8, 6)); ax = fig.gca()
+
+fig = mdcs.fit_selection(distributions=guess_dists, matrix_element=mat_el, 
+                         matrix_args=mat_args, ax=ax)
+```
+
+```{python}
+self_five = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Inner_left_5',
+                                bare_mass=0.59521794, fermi_wavevector=0.141069758, side='left'))
+
+self_six = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Outer_left_6', 
+                                bare_mass=0.58997502, fermi_wavevector=0.1411192, side='left'))
+
+self_five.plot_both()
+```
+
+```{python}
+# %matplotlib inline
+
+fig, ax = plt.subplots(2, 1, figsize=(6, 8))
+
+fig, spectrum, model, omega_range, aval_select = self_energy.extract_a2f(
+                                omega_min=0.5, omega_max=120, omega_num=250, 
+                                omega_I=20, omega_M=100, omega_S=1.0, aval_min=0.0,
+                                aval_max=8.0, aval_num=10, parts='both',
+                                ecut_left=3.0, h_n=0.0741008, impurity_magnitude=16.475007,
+                                ax=ax[0], show=False, fig_close=False)
+
+fig, spectrum_left, model, omega_range, aval_select = self_five.extract_a2f(
+                                omega_min=0.5, omega_max=120, omega_num=250, 
+                                omega_I=20, omega_M=100, omega_S=1.0, aval_min=0.0,
+                                aval_max=8.0, aval_num=10, parts='both',
+                                ecut_left=3.0, h_n=0.0743720, impurity_magnitude=15.882396,
+                                ax=ax[1], show=False, fig_close=False)
+
+# Figure customization
+ax[0].set_xlabel(''); ax[0].set_xticklabels([])
+ax[0].set_title('$\chi^2$-kink')
+fig.subplots_adjust(top=0.92, hspace=0.1)
+plt.show()
+```
+
+```{python}
+with xarpes.trim_notebook_output(print_lines=10):
+    spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(omega_min=0.5,
+                omega_max=120, omega_num=250, omega_I=20, omega_M=100, omega_S=1.0,
+                aval_min=0.0, aval_max=8.0, aval_num=10, method='chi2kink',
+                parts='both', ecut_left=3, iter_max=1e4, t_criterion=1e-8,
+                power=4, bare_mass=0.6094394681, fermi_wavevector=0.1420916364, h_n=0.07582382627, 
+                impurity_magnitude=14.64962434, lambda_el=2.064840668e-07,
+                vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", 
+                    "h_n"), scale_imp=1.0, scale_lambda_el=1.0, scale_kF=0.1, scale_mb=1.0, scale_hn=1.0,
+                    print_lines=10)
+```
+
+```{python}
+# %matplotlib inline
+
+fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
+
+fig = self_energy.plot_spectra(ax=ax)
+
+plt.show()
 ```

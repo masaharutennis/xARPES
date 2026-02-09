@@ -148,8 +148,8 @@ def extend_function(abscissa_range, abscissa_resolution):
     return extend, step, numb
 
 
-def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
-    r"""The error function used inside the fit_leastsq function.
+def error_function(p, xdata, ydata, function, resolution, yerr, *extra_args):
+    r"""The error function used inside the fit_least_squares function.
 
     Parameters
     ----------
@@ -187,57 +187,53 @@ def error_function(p, xdata, ydata, function, resolution, yerr, extra_args):
     return residual
 
 
-def fit_leastsq(p0, xdata, ydata, function, resolution=None,
-                yerr=None, *extra_args):
-    r"""Wrapper around scipy.optimize.leastsq.
+def fit_least_squares(p0, xdata, ydata, function, resolution=None, yerr=None,
+                      bounds=None, extra_args=None):
+    r"""Least-squares fit using `scipy.optimize.least_squares`.
 
-    Parameters
-    ----------
-    p0 : ndarray
-        Initial guess for parameters to be optimized.
-    xdata : ndarray
-        Abscissa values the function is evaluated on.
-    ydata : ndarray
-        Measured values to compare to.
-    function : callable
-        Function or class with __call__ method to evaluate.
-    resolution : float or None, optional
-        Convolution resolution (sigma), if applicable.
-    yerr : ndarray or None, optional
-        Standard deviations of ydata. Defaults to ones if None.
-    extra_args : tuple
-        Additional arguments passed to the function.
+    Default behavior is Levenberg–Marquardt (`method="lm"`) when unbounded.
+    If `bounds` is provided, switches to trust-region reflective (`"trf"`).
 
-    Returns
-    -------
-    pfit_leastsq : ndarray
-        Optimized parameters.
-    pcov : ndarray or float
-        Scaled covariance matrix of the optimized parameters.
-        If the covariance could not be estimated, returns np.inf.
+    Returns (pfit, pcov, success) in the same style as the old `leastsq`
+    wrapper, with an additional boolean `success` from SciPy.
     """
-    from scipy.optimize import leastsq
+    from scipy.optimize import least_squares
 
     if yerr is None:
         yerr = np.ones_like(ydata)
 
-    pfit, pcov, infodict, errmsg, success = leastsq(
-        error_function,
-        p0,
-        args=(xdata, ydata, function, resolution, yerr, extra_args),
-        full_output=1
-    )
+    if extra_args is None:
+        extra_args = ()
 
-    if (len(ydata) > len(p0)) and pcov is not None:
-        s_sq = (
-            error_function(pfit, xdata, ydata, function, resolution,
-                           yerr, extra_args) ** 2
-        ).sum() / (len(ydata) - len(p0))
-        pcov *= s_sq
+    def _residuals(p):
+        return error_function(
+            p, xdata, ydata, function, resolution, yerr, *extra_args
+        )
+
+    if bounds is None:
+        res = least_squares(_residuals, p0, method="lm")
+    else:
+        res = least_squares(_residuals, p0, method="trf", bounds=bounds)
+
+    pfit = res.x
+    success = bool(getattr(res, "success", False))
+
+    m = len(ydata)
+    n = pfit.size
+
+    if (m > n) and (res.jac is not None) and res.jac.size:
+        resid = res.fun
+        s_sq = (resid ** 2).sum() / (m - n)
+
+        try:
+            jtj = res.jac.T @ res.jac
+            pcov = np.linalg.inv(jtj) * s_sq
+        except np.linalg.LinAlgError:
+            pcov = np.inf
     else:
         pcov = np.inf
 
-    return pfit, pcov
+    return pfit, pcov, success
 
 
 def download_examples():
@@ -393,18 +389,18 @@ def set_script_dir():
     return script_dir
 
 
-def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
+def MEM_core(dvec, model_in, uvec, mu, aval, wvec, V_Sigma, U,
              t_criterion, iter_max):
     r"""
     Implementation of Bryan's algorithm (not to be confused with Bryan's
-    'method' for determining the Lagrange multiplier alpha. For details, see
+    'method' for determining the Lagrange multiplier aval. For details, see
     Eur. Biophys. J. 18, 165 (1990).
     """
     import numpy as np
     import warnings
 
     spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
-    alphamu = alpha + mu
+    avalmu = aval + mu
 
     converged = False
     iter_count = 0
@@ -423,20 +419,20 @@ def MEM_core(dvec, model_in, uvec, mu, alpha, wvec, V_Sigma, U,
         Y_inv = R.T @ (sqrt_xi[:, None] * P.T)  # Below Eq. 15
 
         # From Eq. 16:
-        Y_inv_du = -(Y_inv @ (alpha * uvec + gvec)) / (alphamu + Lambda)
+        Y_inv_du = -(Y_inv @ (aval * uvec + gvec)) / (avalmu + Lambda)
         d_uvec = (
-            -alpha * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
-        ) / alphamu  # Eq. 20
+            -aval * uvec - gvec - M @ (Y_inv.T @ Y_inv_du)
+        ) / avalmu  # Eq. 20
 
         uvec += d_uvec
         spectrum_in = model_in * np.exp(U @ uvec)  # Eq. 9
 
         # Convergence block: Section 2.3
-        alpha_K_u = alpha * (K @ uvec)  # Skipping the minus sign twice
+        aval_K_u = aval * (K @ uvec)  # Skipping the minus sign twice
         K_g = K @ gvec
         tcon = (
-            2 * np.linalg.norm(alpha_K_u + K_g)**2
-            / (np.linalg.norm(alpha_K_u) + np.linalg.norm(K_g))**2
+            2 * np.linalg.norm(aval_K_u + K_g)**2
+            / (np.linalg.norm(aval_K_u) + np.linalg.norm(K_g))**2
         )
         converged = (tcon < t_criterion)
 
@@ -629,3 +625,167 @@ def chi2kink_logistic(x, a, b, c, d):
         phi[mneg] = a + b * expz / (1.0 + expz)
 
     return phi
+
+def _in_ipython():
+    try:
+        from IPython import get_ipython
+    except Exception:
+        return False
+    return get_ipython() is not None
+
+
+class _LineBuffer:
+    """Capture text as lines, keeping only head + tail and total count."""
+    def __init__(self, head=10, tail=10):
+        from collections import deque
+        self.head = int(head)
+        self.tail = int(tail)
+        self._head_lines = []
+        self._tail_lines = deque(maxlen=self.tail)
+        self._partial = ""
+        self._n_lines = 0
+
+    def feed(self, text):
+        if not text:
+            return
+
+        # Normalize carriage returns (progress bars etc.)
+        text = str(text).replace("\r", "\n")
+
+        # Prepend any partial line from previous write.
+        text = self._partial + text
+        parts = text.split("\n")
+
+        # If text does not end with '\n', last part is partial.
+        self._partial = parts.pop()  # may be "" if ended with newline
+
+        for line in parts:
+            # Record completed line
+            self._n_lines += 1
+            if len(self._head_lines) < self.head:
+                self._head_lines.append(line)
+            else:
+                if self.tail > 0:
+                    self._tail_lines.append(line)
+
+    def finalize(self):
+        # If there is an unfinished line, treat it as a line.
+        if self._partial.strip() != "":
+            self.feed("\n")  # forces it into completed lines
+        self._partial = ""
+
+    def summary(self):
+        self.finalize()
+
+        n = self._n_lines
+        if n == 0:
+            return ""
+
+        # If total small, reconstruct from head + tail if possible
+        if n <= self.head + self.tail:
+            # We didn't keep all middle lines, but if n <= head+tail we kept all.
+            # For n <= head, tail may be empty; for n > head, tail contains rest.
+            out = list(self._head_lines)
+            if n > len(self._head_lines):
+                out.extend(list(self._tail_lines))
+            return "\n".join(out)
+
+        omitted = n - self.head - self.tail
+        head_txt = "\n".join(self._head_lines)
+        tail_txt = "\n".join(list(self._tail_lines))
+        return (
+            f"{head_txt}\n"
+            f"... ({omitted} lines omitted) ...\n"
+            f"{tail_txt}"
+        )
+
+
+def trim_notebook_output(print_lines=10, *, enabled=True, clear=True,
+                         capture_stderr=True, sleep_s=0.05):
+    """Context manager: show live prints, then keep only head/tail in notebooks.
+
+    In plain scripts (no IPython), this is a no-op.
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _ctx():
+        if (not enabled) or (print_lines is None):
+            yield
+            return
+
+        n = int(print_lines)
+        if n <= 0:
+            yield
+            return
+
+        # Only do this in IPython environments; scripts should print normally.
+        if not _in_ipython():
+            yield
+            return
+
+        import sys
+        import time
+
+        buf = _LineBuffer(head=n, tail=n)
+
+        stdout_orig = sys.stdout
+        stderr_orig = sys.stderr
+
+        class _TeeStream:
+            def __init__(self, real_stream, buffer):
+                self._real = real_stream
+                self._buf = buffer
+
+            def write(self, text):
+                # Live output
+                try:
+                    self._real.write(text)
+                    self._real.flush()
+                except Exception:
+                    pass
+                # Capture
+                self._buf.feed(text)
+
+            def flush(self):
+                try:
+                    self._real.flush()
+                except Exception:
+                    pass
+
+            # Some libraries ask for these:
+            def isatty(self):
+                return False
+
+            @property
+            def encoding(self):
+                return getattr(self._real, "encoding", "utf-8")
+
+        sys.stdout = _TeeStream(stdout_orig, buf)
+        if capture_stderr:
+            sys.stderr = _TeeStream(stderr_orig, buf)
+
+        try:
+            yield
+        finally:
+            # Restore streams first.
+            sys.stdout = stdout_orig
+            sys.stderr = stderr_orig
+
+            # Let Jupyter finish rendering any queued output.
+            if sleep_s:
+                time.sleep(float(sleep_s))
+
+            # Clear cell output and print summary.
+            summary = buf.summary()
+            if clear:
+                try:
+                    from IPython.display import clear_output
+                    clear_output(wait=True)
+                except Exception:
+                    pass
+
+            if summary:
+                print(summary)
+
+    return _ctx()

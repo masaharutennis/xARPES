@@ -33,8 +33,8 @@ class SelfEnergy:
                 properties = properties[0]
             else:
                 raise ValueError(
-            "`properties` must be a dict or a single dict in a list."
-             )
+                    "`properties` must be a dict or a single dict in a list."
+                )
 
         # single source of truth for all params (+ their *_sigma)
         self._properties = dict(properties or {})
@@ -84,12 +84,19 @@ class SelfEnergy:
         self._imag = None
         self._imag_sigma = None
 
+        # lazy caches for α²F(ω) extraction results
+        self._a2f_spectrum = None
+        self._a2f_model = None
+        self._a2f_omega_range = None
+        self._a2f_aval_select = None
+        self._a2f_cost = None
+
     def _check_mass_velocity_exclusivity(self):
         """Ensure that fermi_velocity and bare_mass are not both set."""
         if (self._fermi_velocity is not None) and (self._bare_mass is not None):
             raise ValueError(
-            "Cannot set both `fermi_velocity` and  `bare_mass`: choose one "
-            "physical parametrization (SpectralLinear or SpectralQuadratic)."
+                "Cannot set both `fermi_velocity` and  `bare_mass`: choose one "
+                "physical parametrization (SpectralLinear or SpectralQuadratic)."
             )
 
     # ---------------- core read-only axes ----------------
@@ -282,13 +289,17 @@ class SelfEnergy:
                         "before accessing peak_positions and quantities that "
                         "depend on the latter."
                     )
-                kpar_mag = (np.sqrt(self._ekin_range / PREF) *
-                    np.sin(np.deg2rad(np.abs(self._peak))))
+                kpar_mag = (
+                    np.sqrt(self._ekin_range / PREF)
+                    * np.sin(np.deg2rad(np.abs(self._peak)))
+                )
                 self._peak_positions = ((-1.0 if self._side == "left"
                                         else 1.0) * kpar_mag)
             else:
-                self._peak_positions = (np.sqrt(self._ekin_range / PREF)
-                * np.sin(np.deg2rad(self._peak)))
+                self._peak_positions = (
+                    np.sqrt(self._ekin_range / PREF)
+                    * np.sin(np.deg2rad(self._peak))
+                )
         return self._peak_positions
     
 
@@ -298,9 +309,11 @@ class SelfEnergy:
         if self._peak_positions_sigma is None:
             if self._peak_sigma is None or self._ekin_range is None:
                 return None
-            self._peak_positions_sigma = ((np.sqrt(self._ekin_range / PREF)
+            self._peak_positions_sigma = (
+                np.sqrt(self._ekin_range / PREF)
                 * np.abs(np.cos(np.deg2rad(self._peak)))
-                * np.deg2rad(self._peak_sigma)))
+                * np.deg2rad(self._peak_sigma)
+            )
         return self._peak_positions_sigma
     
 
@@ -342,6 +355,31 @@ class SelfEnergy:
                 return None
             self._real_sigma = self._compute_real_sigma()
         return self._real_sigma
+    
+    @property
+    def a2f_spectrum(self):
+        """Cached α²F(ω) spectrum from last extraction (or None)."""
+        return self._a2f_spectrum
+
+    @property
+    def a2f_model(self):
+        """Cached MEM model spectrum from last extraction (or None)."""
+        return self._a2f_model
+
+    @property
+    def a2f_omega_range(self):
+        """Cached ω grid for the last extraction (or None)."""
+        return self._a2f_omega_range
+
+    @property
+    def a2f_aval_select(self):
+        """Cached selected a-value from last extraction (or None)."""
+        return self._a2f_aval_select
+
+    @property
+    def a2f_cost(self):
+        """Cached cost from last bayesian_loop (or None)."""
+        return self._a2f_cost
 
 
     def _compute_imag(self, fermi_velocity=None, bare_mass=None):
@@ -549,15 +587,37 @@ class SelfEnergy:
         imag_label = rf"$-\Sigma_{{\mathrm{{{safe_label}}}}}''(E)$"
 
         return real_label, imag_label
+    
+    def _a2f_legend_labels(self):
+        """Return (a2f_label, model_label) for legend with safe subscripts."""
+        se_label = getattr(self, "label", None)
+
+        if se_label is None:
+            return r"$\alpha^2F(\omega)$", r"$m(\omega)$"
+
+        safe_label = str(se_label).replace("_", r"\_")
+        if safe_label == "":
+            return r"$\alpha^2F(\omega)$", r"$m(\omega)$"
+
+        a2f_label = rf"$\alpha^2F_{{\mathrm{{{safe_label}}}}}(\omega)$"
+        model_label = rf"$m_{{\mathrm{{{safe_label}}}}}(\omega)$"
+        return a2f_label, model_label
 
     @add_fig_kwargs
-    def plot_real(self, ax=None, **kwargs):
-        r"""Plot the real part Σ' of the self-energy as a function of E-μ.
+    def plot_real(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
+        """Plot the real part Σ' of the self-energy as a function of E-μ.
 
         Parameters
         ----------
         ax : Matplotlib-Axes or None
             Axis to plot on. Created if not provided by the user.
+        scale : {"eV", "meV"}
+            Units for both axes. If "meV", x and y (and yerr) are multiplied by
+            `KILO`.
+        resolution_range : {"absent", "applied"}
+            If "applied", removes points with E-μ <= energy_resolution (around
+            the chemical potential). The energy resolution is taken from
+            ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
         **kwargs :
             Additional keyword arguments passed to ``ax.errorbar``.
 
@@ -570,9 +630,30 @@ class SelfEnergy:
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
+        if scale not in ("eV", "meV"):
+            raise ValueError("scale must be either 'eV' or 'meV'.")
+        if resolution_range not in ("absent", "applied"):
+            raise ValueError("resolution_range must be 'absent' or 'applied'.")
+
+        factor = KILO if scale == "meV" else 1.0
+
         x = self.enel_range
         y = self.real
         y_sigma = self.real_sigma
+
+        if x is not None:
+            x = factor * np.asarray(x, dtype=float)
+        if y is not None:
+            y = factor * np.asarray(y, dtype=float)
+
+        if resolution_range == "applied" and x is not None and y is not None:
+            res = self.energy_resolution
+            if res is not None:
+                keep = np.abs(x) > (factor * float(res))
+                x = x[keep]
+                y = y[keep]
+                if y_sigma is not None:
+                    y_sigma = np.asarray(y_sigma, dtype=float)[keep]
 
         real_label, _ = self._se_legend_labels()
         kwargs.setdefault("label", real_label)
@@ -583,23 +664,33 @@ class SelfEnergy:
                     "Warning: some Σ'(E) uncertainty values are missing. "
                     "Error bars omitted at those energies."
                 )
-            kwargs.setdefault("yerr", xprs.sigma_confidence * y_sigma)
+            kwargs.setdefault("yerr", xprs.sigma_confidence * factor * y_sigma)
 
         ax.errorbar(x, y, **kwargs)
-        ax.set_xlabel(r"$E-\mu$ (eV)")
-        ax.set_ylabel(r"$\Sigma'(E)$ (eV)")
+
+        x_unit = "meV" if scale == "meV" else "eV"
+        ax.set_xlabel(rf"$E-\mu$ ({x_unit})")
+        ax.set_ylabel(rf"$\Sigma'(E)$ ({x_unit})")
         ax.legend()
 
         return fig
 
+
     @add_fig_kwargs
-    def plot_imag(self, ax=None, **kwargs):
-        r"""Plot the imaginary part -Σ'' of the self-energy vs. E-μ.
+    def plot_imag(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
+        """Plot the imaginary part -Σ'' of the self-energy vs. E-μ.
 
         Parameters
         ----------
         ax : Matplotlib-Axes or None
             Axis to plot on. Created if not provided by the user.
+        scale : {"eV", "meV"}
+            Units for both axes. If "meV", x and y (and yerr) are multiplied by
+            `KILO`.
+        resolution_range : {"absent", "applied"}
+            If "applied", removes points with E-μ <= energy_resolution (around
+            the chemical potential). The energy resolution is taken from
+            ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
         **kwargs :
             Additional keyword arguments passed to ``ax.errorbar``.
 
@@ -612,9 +703,30 @@ class SelfEnergy:
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
 
+        if scale not in ("eV", "meV"):
+            raise ValueError("scale must be either 'eV' or 'meV'.")
+        if resolution_range not in ("absent", "applied"):
+            raise ValueError("resolution_range must be 'absent' or 'applied'.")
+
+        factor = KILO if scale == "meV" else 1.0
+
         x = self.enel_range
         y = self.imag
         y_sigma = self.imag_sigma
+
+        if x is not None:
+            x = factor * np.asarray(x, dtype=float)
+        if y is not None:
+            y = factor * np.asarray(y, dtype=float)
+
+        if resolution_range == "applied" and x is not None and y is not None:
+            res = self.energy_resolution
+            if res is not None:
+                keep = np.abs(x) > (factor * float(res))
+                x = x[keep]
+                y = y[keep]
+                if y_sigma is not None:
+                    y_sigma = np.asarray(y_sigma, dtype=float)[keep]
 
         _, imag_label = self._se_legend_labels()
         kwargs.setdefault("label", imag_label)
@@ -625,21 +737,46 @@ class SelfEnergy:
                     "Warning: some -Σ''(E) uncertainty values are missing. "
                     "Error bars omitted at those energies."
                 )
-            kwargs.setdefault("yerr", xprs.sigma_confidence * y_sigma)
+            kwargs.setdefault("yerr", xprs.sigma_confidence * factor * y_sigma)
 
         ax.errorbar(x, y, **kwargs)
-        ax.set_xlabel(r"$E-\mu$ (eV)")
-        ax.set_ylabel(r"$-\Sigma''(E)$ (eV)")
+
+        x_unit = "meV" if scale == "meV" else "eV"
+        ax.set_xlabel(rf"$E-\mu$ ({x_unit})")
+        ax.set_ylabel(rf"$-\Sigma''(E)$ ({x_unit})")
         ax.legend()
 
         return fig
 
+
     @add_fig_kwargs
-    def plot_both(self, ax=None, **kwargs):
-        r"""Plot Σ'(E) and -Σ''(E) vs. E-μ on the same axis."""
+    def plot_both(self, ax=None, scale="eV", resolution_range="absent", **kwargs):
+        """Plot Σ'(E) and -Σ''(E) vs. E-μ on the same axis.
+
+        Parameters
+        ----------
+        ax : Matplotlib-Axes or None
+            Axis to plot on. Created if not provided by the user.
+        scale : {"eV", "meV"}
+            Units for both axes. If "meV", x, y, and yerr are multiplied by
+            `KILO`.
+        resolution_range : {"absent", "applied"}
+            If "applied", removes points with \-μ <= energy_resolution (around
+            the chemical potential). The energy resolution is taken from
+            ``self.energy_resolution`` (in eV) and scaled consistently with `scale`.
+        **kwargs :
+            Additional keyword arguments passed to ``ax.errorbar``.
+        """
         from . import settings_parameters as xprs
 
         ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        if scale not in ("eV", "meV"):
+            raise ValueError("scale must be either 'eV' or 'meV'.")
+        if resolution_range not in ("absent", "applied"):
+            raise ValueError("resolution_range must be 'absent' or 'applied'.")
+
+        factor = KILO if scale == "meV" else 1.0
 
         x = self.enel_range
         real = self.real
@@ -647,9 +784,29 @@ class SelfEnergy:
         real_sigma = self.real_sigma
         imag_sigma = self.imag_sigma
 
+        if x is not None:
+            x = factor * np.asarray(x, dtype=float)
+        if real is not None:
+            real = factor * np.asarray(real, dtype=float)
+        if imag is not None:
+            imag = factor * np.asarray(imag, dtype=float)
+
+        if resolution_range == "applied" and x is not None:
+            res = self.energy_resolution
+            if res is not None:
+                keep = np.abs(x) > (factor * float(res))
+                x = x[keep]
+                if real is not None:
+                    real = real[keep]
+                if imag is not None:
+                    imag = imag[keep]
+                if real_sigma is not None:
+                    real_sigma = np.asarray(real_sigma, dtype=float)[keep]
+                if imag_sigma is not None:
+                    imag_sigma = np.asarray(imag_sigma, dtype=float)[keep]
+
         real_label, imag_label = self._se_legend_labels()
 
-        # --- plot Σ'
         kw_real = dict(kwargs)
         if real_sigma is not None:
             if np.isnan(real_sigma).any():
@@ -657,11 +814,10 @@ class SelfEnergy:
                     "Warning: some Σ'(E) uncertainty values are missing. "
                     "Error bars omitted at those energies."
                 )
-            kw_real.setdefault("yerr", xprs.sigma_confidence * real_sigma)
+            kw_real.setdefault("yerr", xprs.sigma_confidence * factor * real_sigma)
         kw_real.setdefault("label", real_label)
         ax.errorbar(x, real, **kw_real)
 
-        # --- plot -Σ''
         kw_imag = dict(kwargs)
         if imag_sigma is not None:
             if np.isnan(imag_sigma).any():
@@ -669,35 +825,195 @@ class SelfEnergy:
                     "Warning: some -Σ''(E) uncertainty values are missing. "
                     "Error bars omitted at those energies."
                 )
-            kw_imag.setdefault("yerr", xprs.sigma_confidence * imag_sigma)
+            kw_imag.setdefault("yerr", xprs.sigma_confidence * factor * imag_sigma)
         kw_imag.setdefault("label", imag_label)
         ax.errorbar(x, imag, **kw_imag)
 
-        ax.set_xlabel(r"$E-\mu$ (eV)")
-        ax.set_ylabel(r"$\Sigma'(E),\ -\Sigma''(E)$ (eV)")
+        x_unit = "meV" if scale == "meV" else "eV"
+        ax.set_xlabel(rf"$E-\mu$ ({x_unit})")
+        ax.set_ylabel(rf"$\Sigma'(E),\ -\Sigma''(E)$ ({x_unit})")
         ax.legend()
 
         return fig
 
+    @add_fig_kwargs
+    def plot_a2f(self, ax=None, abscissa="forward", **kwargs):
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
 
+        xlim_in = ax.get_xlim()
+        ylim_in = ax.get_ylim()
+
+        if abscissa not in ("forward", "reversed"):
+            raise ValueError("abscissa must be either 'forward' or 'reversed'.")
+
+        omega = self.a2f_omega_range
+        spectrum = self.a2f_spectrum
+
+        if omega is None or spectrum is None:
+            raise AttributeError(
+                "No cached α²F(ω) spectrum found. Run `extract_a2f()` or "
+                "`bayesian_loop()` first."
+            )
+
+        if abscissa == "reversed":
+            omega = -omega[::-1]
+            spectrum = spectrum[::-1]
+
+        a2f_label, _ = self._a2f_legend_labels()
+        kwargs.setdefault("label", a2f_label)
+        ax.plot(omega, spectrum, **kwargs)
+
+        ax.set_xlabel(r"$\omega$ (meV)")
+        ax.set_ylabel(r"$\alpha^2F(\omega)$ (-)")
+
+        self._apply_spectra_axis_defaults(ax, omega, abscissa, xlim_in, ylim_in)
+
+        ax.legend()
+        return fig
+
+    @add_fig_kwargs
+    def plot_model(self, ax=None, abscissa="forward", **kwargs):
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        xlim_in = ax.get_xlim()
+        ylim_in = ax.get_ylim()
+
+        if abscissa not in ("forward", "reversed"):
+            raise ValueError("abscissa must be either 'forward' or 'reversed'.")
+
+        omega = self.a2f_omega_range
+        model = self.a2f_model
+
+        if omega is None or model is None:
+            raise AttributeError(
+                "No cached model spectrum found. Run `extract_a2f()` or "
+                "`bayesian_loop()` first."
+            )
+
+        if abscissa == "reversed":
+            omega = -omega[::-1]
+            model = model[::-1]
+
+        _, model_label = self._a2f_legend_labels()
+        kwargs.setdefault("label", model_label)
+        ax.plot(omega, model, **kwargs)
+
+        ax.set_xlabel(r"$\omega$ (meV)")
+        ax.set_ylabel(r"$m(\omega)$ (-)")
+
+        self._apply_spectra_axis_defaults(ax, omega, abscissa, xlim_in, ylim_in)
+
+        ax.legend()
+        return fig
+    
+    @add_fig_kwargs
+    def plot_spectra(self, ax=None, abscissa="forward", **kwargs):
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
+
+        xlim_in = ax.get_xlim()
+        ylim_in = ax.get_ylim()
+
+        if abscissa not in ("forward", "reversed"):
+            raise ValueError("abscissa must be either 'forward' or 'reversed'.")
+
+        omega = self.a2f_omega_range
+        spectrum = self.a2f_spectrum
+        model = self.a2f_model
+
+        if omega is None or spectrum is None or model is None:
+            raise AttributeError(
+                "No cached spectra found. Run `extract_a2f()` or `bayesian_loop()` "
+                "first."
+            )
+
+        if abscissa == "reversed":
+            omega = -omega[::-1]
+            spectrum = spectrum[::-1]
+            model = model[::-1]
+
+        kw_a2f = dict(kwargs)
+        kw_model = dict(kwargs)
+        a2f_label, model_label = self._a2f_legend_labels()
+        kw_a2f.setdefault("label", a2f_label)
+        kw_model.setdefault("label", model_label)
+
+        ax.plot(omega, spectrum, **kw_a2f)
+        ax.plot(omega, model, **kw_model)
+
+        self._apply_spectra_axis_defaults(ax, omega, abscissa, xlim_in, ylim_in)
+
+        ax.set_xlabel(r"$\omega$ (meV)")
+        ax.set_ylabel(r"$\alpha^2F_n(\omega),~m_n(\omega)~(-)$")
+        ax.legend()
+
+        return fig
+
+    @staticmethod
+    def _apply_spectra_axis_defaults(ax, omega, abscissa, xlim_in, ylim_in):
+        """Apply default spectra x-range and y-min, without stomping overrides.
+
+        Defaults are applied only if the incoming axis limits were Matplotlib's
+        defaults (0, 1), i.e. the caller did not pre-set them.
+        """
+        if abscissa not in ("forward", "reversed"):
+            raise ValueError("abscissa must be either 'forward' or 'reversed'.")
+
+        omega_max = float(np.max(np.abs(omega)))
+
+        # --- X defaults (only if user did not pre-set xlim)
+        x0, x1 = xlim_in
+        x_is_default = np.isclose(x0, 0.0) and np.isclose(x1, 1.0)
+        if x_is_default:
+            if abscissa == "forward":
+                ax.set_xlim(0.0, omega_max)
+            else:
+                ax.set_xlim(-omega_max, 0.0)
+
+        # --- Y default: set only the bottom to 0 (only if user did not pre-set)
+        y0, y1 = ylim_in
+        y_is_default = np.isclose(y0, 0.0) and np.isclose(y1, 1.0)
+        if y_is_default:
+            ax.set_ylim(bottom=0.0)
+
+
+    @add_fig_kwargs
     def extract_a2f(self, *, omega_min, omega_max, omega_num, omega_I, omega_M,
-                    mem=None, **mem_kwargs):
+                    mem=None, ax=None, **mem_kwargs):
         r"""
         Extract Eliashberg function α²F(ω) from the self-energy. While working
         with band maps and MDCs is more intuitive in eV, the self-energy
         extraction is performed in eV.
 
+        Parameters
+        ----------
+        ax : Matplotlib-Axes or None
+            Axis to plot on. Created if not provided by the user. (Not used yet;
+            reserved for future plotting.)
+
+        Returns
+        -------
+        spectrum : ndarray
+            Extracted α²F(ω).
+        model : ndarray
+            MEM model spectrum.
+        omega_range : ndarray
+            ω grid used for the extraction.
+        aval_select : float
+            Selected a-value returned by the chi2kink procedure.
         """
         from . import settings_parameters as xprs
+
+        # Reserve the plot API now; not used yet, but this matches xARPES style.
+        ax, fig, plt = get_ax_fig_plt(ax=ax)
 
         mem_cfg = self._merge_defaults(xprs.mem_defaults, mem, mem_kwargs)
 
         method = mem_cfg["method"]
         parts = mem_cfg["parts"]
         iter_max = int(mem_cfg["iter_max"])
-        alpha_min = float(mem_cfg["alpha_min"])
-        alpha_max = float(mem_cfg["alpha_max"])
-        alpha_num = int(mem_cfg["alpha_num"])
+        aval_min = float(mem_cfg["aval_min"])
+        aval_max = float(mem_cfg["aval_max"])
+        aval_num = int(mem_cfg["aval_num"])
         ecut_left = float(mem_cfg["ecut_left"])
         ecut_right = mem_cfg["ecut_right"]
         omega_S = float(mem_cfg["omega_S"])
@@ -705,15 +1021,14 @@ class SelfEnergy:
         sigma_svd = float(mem_cfg["sigma_svd"])
         t_criterion = float(mem_cfg["t_criterion"])
         mu = float(mem_cfg["mu"])
-        a_guess = float(mem_cfg["a_guess"])
+        g_guess = float(mem_cfg["g_guess"])
         b_guess = float(mem_cfg["b_guess"])
         c_guess = float(mem_cfg["c_guess"])
         d_guess = float(mem_cfg["d_guess"])
         power = int(mem_cfg["power"])
-        lambda_el = int(mem_cfg["lambda_el"])
-        impurity_magnitude = int(mem_cfg["impurity_magnitude"])
+        lambda_el = float(mem_cfg["lambda_el"])
+        impurity_magnitude = float(mem_cfg["impurity_magnitude"])
         W = mem_cfg.get("W", None)
-
 
         if omega_S < 0.0:
             raise ValueError("omega_S must be >= 0.")
@@ -721,22 +1036,24 @@ class SelfEnergy:
             f_chi_squared = 2.5 if parts == "both" else 2.0
         else:
             f_chi_squared = float(f_chi_squared)
+        if d_guess <= 0.0:
+            raise ValueError(
+                "chi2kink requires d_guess > 0 to fix the logistic sign "
+                "ambiguity."
+            )
 
         h_n = mem_cfg.get("h_n", None)
         if h_n is None:
             raise ValueError(
-                "`h_n` must be provided explicitly (h_n=... or mem={'h_n': ...}). "
-                "No default is assumed."
+                "`optimisation_parameters` must include 'h_n' for cost evaluation."
             )
 
         from . import (create_model_function, create_kernel_function,
                        singular_value_decomposition, MEM_core)
 
         omega_range = np.linspace(omega_min, omega_max, omega_num)
+        model = create_model_function(omega_range, omega_I, omega_M, omega_S, h_n)
 
-        model = create_model_function(omega_range, omega_I, omega_M, omega_S,
-                                       h_n)
-        
         delta_omega = (omega_max - omega_min) / (omega_num - 1)
         model_in = model * delta_omega
 
@@ -760,7 +1077,6 @@ class SelfEnergy:
 
         energies_eV_masked = energies_eV[mE]
         energies = energies_eV_masked * KILO
-
         k_BT = K_B * self.temperature * KILO
 
         kernel = create_kernel_function(energies, omega_range, k_BT)
@@ -768,13 +1084,12 @@ class SelfEnergy:
         if lambda_el:
             if W is None:
                 if self._class == "SpectralQuadratic":
-                    W = (PREF * self._fermi_wavevector**2 / self._bare_mass
-                    ) * KILO
+                    W = (PREF * self._fermi_wavevector**2 / self._bare_mass) * KILO
                 else:
                     raise ValueError(
-                    "lambda_el was provided, but W is None. For a linearised "
-                    "band (SpectralLinear), you must also provide W in meV: "
-                    "the electron–electron interaction  scale."
+                        "lambda_el was provided, but W is None. For a linearised "
+                        "band (SpectralLinear), you must also provide W in meV: "
+                        "the electron–electron interaction  scale."
                     )
 
             energies_el = energies_eV_masked * KILO
@@ -793,14 +1108,12 @@ class SelfEnergy:
             dvec = np.concatenate((real, imag))
             wvec = np.concatenate((real_sigma**(-2), imag_sigma**(-2)))
             H = np.concatenate((np.real(kernel), -np.imag(kernel)))
-
         elif parts == "real":
             real = self.real[mE] * KILO - real_el
             real_sigma = self.real_sigma[mE] * KILO
             dvec = real
             wvec = real_sigma**(-2)
             H = np.real(kernel)
-
         else:  # parts == "imag"
             imag = self.imag[mE] * KILO - impurity_magnitude - imag_el
             imag_sigma = self.imag_sigma[mE] * KILO
@@ -811,13 +1124,55 @@ class SelfEnergy:
         V_Sigma, U, uvec = singular_value_decomposition(H, sigma_svd)
 
         if method == "chi2kink":
-            spectrum_in, _ = self._chi2kink_a2f(dvec, model_in, uvec, mu, wvec,
-                V_Sigma, U, alpha_min, alpha_max, alpha_num, a_guess, b_guess,
-                 c_guess, d_guess, f_chi_squared, t_criterion, iter_max, 
-                 MEM_core)
+            (spectrum_in, aval_select, fit_curve, guess_curve,
+            chi2kink_result) = self._chi2kink_a2f(
+                dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min,
+                aval_max, aval_num, g_guess, b_guess, c_guess, d_guess,
+                f_chi_squared, t_criterion, iter_max, MEM_core
+            )
+        else:
+            raise NotImplementedError(
+                f"extract_a2f does not support method='{method}'."
+            )
 
+        # --- Plot on ax: always raw chi2 + guess; add fit only if success ---
+        aval_range = chi2kink_result["aval_range"]
+        aval0 = float(aval_range[0])
+        x_plot = np.log10(aval_range / aval0)
+        y_chi2 = chi2kink_result["log_chi_squared"]
+
+        ax.set_xlabel(r"log$_{10}(a)$ (-)")
+        ax.set_ylabel(r"log$_{10}(\chi^2)$ (-)")
+
+        ax.plot(x_plot, y_chi2, label="data")
+        ax.plot(x_plot, guess_curve, label="guess")
+
+        if chi2kink_result["success"]:
+            ax.plot(x_plot, fit_curve, label="fit")
+            ax.axvline(
+                np.log10(aval_select / aval0),
+                linestyle="--",
+                label=r"$a_{\rm sel}$",
+            )
+        ax.legend()
+
+        # Abort extraction if fit failed (you asked to terminate in that case)
+        if not chi2kink_result["success"]:
+            raise RuntimeError(
+                "chi2kink logistic fit failed; aborting extract_a2f after "
+                "plotting chi2 and guess."
+            )
+
+        # From here on, we know spectrum_in and aval_select exist
         spectrum = spectrum_in * omega_num / omega_max
-        return spectrum, model
+
+        self._a2f_spectrum = spectrum
+        self._a2f_model = model
+        self._a2f_omega_range = omega_range
+        self._a2f_aval_select = aval_select
+        self._a2f_cost = None
+
+        return fig, spectrum, model, omega_range, aval_select
     
 
     def bayesian_loop(self, *, omega_min, omega_max, omega_num, omega_I, 
@@ -837,13 +1192,27 @@ class SelfEnergy:
         - SpectralLinear: additionally "fermi_velocity"
         - SpectralQuadratic: additionally "bare_mass"
 
+        Notes
+        -----
+        **Convergence behaviour**
+
+        By default, convergence is controlled by a *custom patience criterion*:
+        the optimization terminates when the absolute difference between the
+        current cost and the best cost seen so far is smaller than `tole` for
+        `converge_iters` consecutive iterations.
+
+        To instead rely on SciPy's native convergence criteria (e.g. Nelder–Mead
+        `xatol` / `fatol`), disable the custom criterion by setting
+        `converge_iters=0` or `tole=None`. In that case, SciPy termination options
+        supplied via `opt_options` are used.
+
         Parameters
         ----------
-        opt_options : dict (optional)
-            Dictionary of options passed directly to scipy.optimize.minimize.
-            User-supplied entries override default values (e.g. xatol, fatol
-            for Nelder–Mead).
+        opt_options : dict, optional
+            Options passed directly to `scipy.optimize.minimize`. These are only
+            used for convergence if the custom criterion is disabled (see Notes).
         """
+
         fermi_velocity, fermi_wavevector, bare_mass = self._prepare_bare(
             fermi_velocity, fermi_wavevector, bare_mass)
         
@@ -885,7 +1254,11 @@ class SelfEnergy:
         h_n0 = float(mem_cfg["h_n"])
         h_n_min = float(mem_cfg.get("h_n_min", 1e-8))
 
-        loop_cfg = self._merge_defaults(xprs.loop_defaults, loop, None)
+        loop_overrides = {
+            key: val for key, val in mem_kwargs.items()
+            if (val is not None) and (key in xprs.loop_defaults)
+        }
+        loop_cfg = self._merge_defaults(xprs.loop_defaults, loop, loop_overrides)
 
         tole = float(loop_cfg["tole"])
         converge_iters = int(loop_cfg["converge_iters"])
@@ -896,9 +1269,20 @@ class SelfEnergy:
         scale_kF = float(loop_cfg["scale_kF"])
         scale_lambda_el = float(loop_cfg["scale_lambda_el"])
         scale_hn = float(loop_cfg["scale_hn"])
-        
-        from scipy.optimize import minimize
-        from . import create_kernel_function, singular_value_decomposition
+
+        rollback_steps = int(loop_cfg.get("rollback_steps"))
+        max_retries = int(loop_cfg.get("max_retries"))
+        relative_best = float(loop_cfg.get("relative_best"))
+        min_steps_for_regression = int(loop_cfg.get("min_steps_for_regression"))
+
+        if rollback_steps < 0:
+            raise ValueError("rollback_steps must be >= 0.")
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0.")
+        if relative_best <= 0.0:
+            raise ValueError("relative_best must be > 0.")
+        if min_steps_for_regression < 0:
+            raise ValueError("min_steps_for_regression must be >= 0.")
 
         vF0 = float(fermi_velocity) if fermi_velocity is not None else None
         kF0 = float(fermi_wavevector) if fermi_wavevector is not None else None
@@ -926,6 +1310,9 @@ class SelfEnergy:
                 )
         if self._class == "SpectralQuadratic" and mb0 is None:
             raise ValueError("bayesian_loop requires an initial bare_mass.")
+        
+        from scipy.optimize import minimize
+        from . import create_kernel_function, singular_value_decomposition
           
         ecut_left = float(mem_cfg["ecut_left"])
         ecut_right = mem_cfg["ecut_right"]
@@ -1002,9 +1389,10 @@ class SelfEnergy:
                     if kF0 is None:
                         raise ValueError(
                             "Cannot vary fermi_wavevector: no initial kF "
-                            "provided.")
+                            "provided."
+                        )
                     params["fermi_wavevector"] = kF0 + scale_kF * xi
-
+                    
                 elif name == "impurity_magnitude":
                     params["impurity_magnitude"] = _reflect_min(xi, imp0, 0.0, scale_imp)
 
@@ -1052,12 +1440,15 @@ class SelfEnergy:
                 _precomp=_precomp
                 )
 
-        last = {"cost": None, "spectrum": None, "model": None, "alpha": None}
+        last = {"cost": None, "spectrum": None, "model": None, "aval": None}
 
         iter_counter = {"n": 0}
 
         class ConvergenceException(RuntimeError):
             """Raised when optimisation has converged successfully."""
+
+        class RegressionException(RuntimeError):
+            """Raised when optimizer regresses toward the initial guess."""
 
         if converge_iters is None:
             converge_iters = 0
@@ -1071,19 +1462,22 @@ class SelfEnergy:
             raise ValueError("converge_iters must be >= 0.")
 
         # Track best solution seen across all obj calls (not just last).
-        best = {
+        best_global = {
             "x": None,
             "params": None,
             "cost": np.inf,
             "spectrum": None,
             "model": None,
-            "alpha": None,
+            "aval": None,
         }
+
+        history = []
 
         # Cache most recent evaluation so the callback can read a cost without
         # forcing an extra objective evaluation.
         last_x = {"x": None}
         last_cost = {"cost": None}
+        initial_cost = {"cost": None}
 
         iter_counter = {"n": 0}
 
@@ -1098,94 +1492,207 @@ class SelfEnergy:
             return out
 
         def obj(x):
+            import warnings
+
             iter_counter["n"] += 1
 
             params = _unpack_params(x)
-            cost, spectrum, model, alpha_select = _evaluate_cost(params)
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", RuntimeWarning)
+                try:
+                    cost, spectrum, model, aval_select = _evaluate_cost(params)
+                except RuntimeWarning as exc:
+                    raise ValueError(f"RuntimeWarning during cost eval: {exc}") from exc
             cost_f = float(cost)
+
+            history.append(
+                {
+                    "x": np.array(x, dtype=float, copy=True),
+                    "params": _clean_params(params),
+                    "cost": cost_f,
+                    "spectrum": spectrum,
+                    "model": model,
+                    "aval": float(aval_select),
+                }
+            )
 
             last["cost"] = cost_f
             last["spectrum"] = spectrum
             last["model"] = model
-            last["alpha"] = float(alpha_select)
+            last["aval"] = float(aval_select)
 
             last_x["x"] = np.array(x, dtype=float, copy=True)
             last_cost["cost"] = cost_f
 
-            if cost_f < best["cost"]:
-                best["x"] = np.array(x, dtype=float, copy=True)
-                best["cost"] = cost_f
-                best["params"] = _clean_params(params)
-                best["spectrum"] = spectrum
-                best["model"] = model
-                best["alpha"] = float(alpha_select)
+            if initial_cost["cost"] is None:
+                initial_cost["cost"] = cost_f
+
+            if cost_f < best_global["cost"]:
+                best_global["x"] = np.array(x, dtype=float, copy=True)
+                best_global["cost"] = cost_f
+                best_global["params"] = _clean_params(params)
+                best_global["spectrum"] = spectrum
+                best_global["model"] = model
+                best_global["aval"] = float(aval_select)
 
             msg = [f"Iter {iter_counter['n']:4d} | cost = {cost: .4e}"]
             for key in sorted(params):
-                msg.append(f"{key}={params[key]:.4g}")
+                msg.append(f"{key}={params[key]:.8g}")
             print(" | ".join(msg))
 
             return cost_f
-
+        
         class TerminationCallback:
-            def __init__(self, tole, converge_iters):
+            def __init__(self, tole, converge_iters,
+                         min_steps_for_regression):
                 self.tole = None if tole is None else float(tole)
                 self.converge_iters = int(converge_iters)
+                self.min_steps_for_regression = int(
+                    min_steps_for_regression
+                )
                 self.iter_count = 0
+                self.call_count = 0
 
             def __call__(self, xk):
+                self.call_count += 1
+
                 if self.tole is None or self.converge_iters <= 0:
                     return
 
-                params = _unpack_params(xk)
-                cost, spectrum, model, alpha_select = _evaluate_cost(params)
-                current = float(cost)
+                current = last_cost["cost"]
+                if current is None:
+                    return
 
-                best_cost = float(best["cost"])
-                if np.isfinite(best_cost) and abs(current - best_cost) < self.tole:
-                    self.iter_count += 1
-                else:
-                    self.iter_count = 0
+                best_cost = float(best_global["cost"])
+                if np.isfinite(best_cost):
+                    if abs(current - best_cost) < self.tole:
+                        self.iter_count += 1
+                    else:
+                        self.iter_count = 0
 
                 if self.iter_count >= self.converge_iters:
                     raise ConvergenceException(
-                        f"Converged: |cost-best| < {self.tole:g} for "
+                        "Converged: |cost-best| < "
+                        f"{self.tole:g} for "
                         f"{self.converge_iters} iterations."
                     )
 
-        callback = TerminationCallback(tole=tole, converge_iters=converge_iters)
+                if self.call_count < self.min_steps_for_regression:
+                    return
+
+                init_cost = initial_cost["cost"]
+                if init_cost is None:
+                    return
+
+                current = float(current)
+                init_cost = float(init_cost)
+
+                if not np.isfinite(best_cost):
+                    return
+
+                if (
+                    abs(current - init_cost) * relative_best
+                    < abs(current - best_cost)
+                ):
+                    raise RegressionException(
+                        "Regression toward initial guess detected."
+                    )
+
+        callback = TerminationCallback(
+            tole=tole,
+            converge_iters=converge_iters,
+            min_steps_for_regression=min_steps_for_regression,
+        )
 
         if not vary:
             params = _unpack_params(np.zeros(0, dtype=float))
-            cost, spectrum, model, alpha_select = _evaluate_cost(params)
-            return cost, spectrum, model, alpha_select
+            cost, spectrum, model, aval_select = _evaluate_cost(params)
+            return cost, spectrum, model, aval_select
 
         x0 = np.zeros(len(vary), dtype=float)
-        
+
         options = {} if opt_options is None else dict(opt_options)
         options.setdefault("maxiter", int(opt_iter_max))
 
         use_patience = (tole is not None) and (int(converge_iters) > 0)
-        if not use_patience:
-            options.setdefault("xatol", 1e-4)
-            options.setdefault("fatol", 1e-4)
+        if use_patience:
+            options.pop("xatol", None)
+            options.pop("fatol", None)
 
-        try:
-            res = minimize(obj, x0, method=opt_method, options=options,
-                           callback=callback)
-        except ConvergenceException as exc:
-            print(str(exc))
-            res = None
+        retry_count = 0
+        res = None
 
-        if best["params"] is None:
+        while retry_count <= max_retries:
+            best = {
+                "x": None,
+                "params": None,
+                "cost": np.inf,
+                "spectrum": None,
+                "model": None,
+                "aval": None,
+            }
+            last_x["x"] = None
+            last_cost["cost"] = None
+            initial_cost["cost"] = None
+            iter_counter["n"] = 0
+            history.clear()
+
+            callback = TerminationCallback(
+                tole=tole,
+                converge_iters=converge_iters,
+                min_steps_for_regression=min_steps_for_regression,
+            )
+
+            try:
+                res = minimize(
+                    obj,
+                    x0,
+                    method=opt_method,
+                    options=options,
+                    callback=callback,
+                )
+                break
+
+            except ConvergenceException as exc:
+                print(str(exc))
+                res = None
+                break
+
+            except RegressionException as exc:
+                print(f"{exc} Rolling back {rollback_steps} steps.")
+                retry_count += 1
+
+                if rollback_steps <= 0 or not history:
+                    continue
+
+                back = min(int(rollback_steps), len(history))
+                x0 = np.array(history[-back]["x"], dtype=float, copy=True)
+                continue
+
+            except ValueError as exc:
+                print(f"ValueError encountered: {exc}. Rolling back.")
+                retry_count += 1
+
+                if rollback_steps <= 0 or not history:
+                    continue
+
+                back = min(int(rollback_steps), len(history))
+                x0 = np.array(history[-back]["x"], dtype=float, copy=True)
+                continue
+
+        if retry_count > max_retries:
+            print("Max retries reached. Parameters may not be optimal.")
+
+        if best_global["params"] is None:
             params = _unpack_params(x0)
-            cost, spectrum, model, alpha_select = _evaluate_cost(params)
+            cost, spectrum, model, aval_select = _evaluate_cost(params)
         else:
-            params = best["params"]
-            cost = best["cost"]
-            spectrum = best["spectrum"]
-            model = best["model"]
-            alpha_select = best["alpha"]
+            params = best_global["params"]
+            cost = best_global["cost"]
+            spectrum = best_global["spectrum"]
+            model = best_global["model"]
+            aval_select = best_global["aval"]
 
         args = ", ".join(
             f"{key}={params[key]:.10g}" if isinstance(params[key], float)
@@ -1195,16 +1702,27 @@ class SelfEnergy:
         print("Optimised parameters:")
         print(args)
 
-        return cost, spectrum, model, alpha_select, params
+        # store inside class methods
+        self._a2f_spectrum = spectrum
+        self._a2f_model = model
+        self._a2f_omega_range = omega_range
+        self._a2f_aval_select = aval_select
+        self._a2f_cost = cost
+
+        return spectrum, model, omega_range, aval_select, cost, params
+
 
     @staticmethod
     def _merge_defaults(defaults, override_dict=None, override_kwargs=None):
         """Merge defaults with dict + kwargs overrides (kwargs win)."""
         cfg = dict(defaults)
-        if override_dict:
+
+        if override_dict is not None:
             cfg.update(dict(override_dict))
-        if override_kwargs:
+
+        if override_kwargs is not None:
             cfg.update({k: v for k, v in override_kwargs.items() if v is not None})
+
         return cfg
 
     def _prepare_bare(self, fermi_velocity, fermi_wavevector, bare_mass):
@@ -1278,9 +1796,10 @@ class SelfEnergy:
             raise NotImplementedError(
             f"_prepare_bare is not implemented for spectral class "
             "'{self._class}'.")
+        
 
     def _cost_function(self, *, optimisation_parameters, omega_min, omega_max,
-                    omega_num, omega_I,omega_M, mem_cfg, _precomp):
+                    omega_num, omega_I, omega_M, mem_cfg, _precomp):
         r"""TBD
 
         Negative log-posterior cost function for Bayesian optimisation.
@@ -1299,13 +1818,13 @@ class SelfEnergy:
         Returns
         -------
         cost : float
-            Negative log-posterior evaluated at the selected alpha.
+            Negative log-posterior evaluated at the selected a-value.
         spectrum : ndarray
             Rescaled α²F(ω) spectrum (same scaling convention as `extract_a2f()`).
         model : ndarray
             The model spectrum used by MEM (same as `extract_a2f()`).
-        alpha_select : float
-            The selected alpha returned by `_chi2kink_a2f`.
+        aval_select : float
+            The selected a-value returned by `_chi2kink_a2f`.
         """
 
         required = {"h_n", "impurity_magnitude", "lambda_el"}
@@ -1317,13 +1836,13 @@ class SelfEnergy:
         
         parts = mem_cfg["parts"]
         method = mem_cfg["method"]
-        alpha_min = float(mem_cfg["alpha_min"])
-        alpha_max = float(mem_cfg["alpha_max"])
-        alpha_num = int(mem_cfg["alpha_num"])
+        aval_min = float(mem_cfg["aval_min"])
+        aval_max = float(mem_cfg["aval_max"])
+        aval_num = int(mem_cfg["aval_num"])
         omega_S = float(mem_cfg["omega_S"])
 
         mu = float(mem_cfg["mu"])
-        a_guess = float(mem_cfg["a_guess"])
+        g_guess = float(mem_cfg["g_guess"])
         b_guess = float(mem_cfg["b_guess"])
         c_guess = float(mem_cfg["c_guess"])
         d_guess = float(mem_cfg["d_guess"])
@@ -1334,19 +1853,14 @@ class SelfEnergy:
         t_criterion = float(mem_cfg["t_criterion"])
         iter_max = int(mem_cfg["iter_max"])
 
-        impurity_magnitude = float(mem_cfg["impurity_magnitude"])
-        lambda_el = float(mem_cfg["lambda_el"])
-
         if f_chi_squared is None:
             f_chi_squared = 2.5 if parts == "both" else 2.0
         else:
             f_chi_squared = float(f_chi_squared)
 
-        h_n = mem_cfg.get("h_n", None)
-        if h_n is None:
+        if d_guess <= 0.0:
             raise ValueError(
-                "`h_n` must be provided explicitly (h_n=... or mem={'h_n': ...}). "
-                "No default is assumed."
+                "chi2kink requires d_guess > 0 to fix the logistic sign ambiguity."
             )
 
         if parts not in {"both", "real", "imag"}:
@@ -1370,15 +1884,28 @@ class SelfEnergy:
             missing_lin = required_lin.difference(optimisation_parameters)
             if missing_lin:
                 raise ValueError(
-                    "SpectralLinear requires optimisation_parameters to " \
-                    "include " f"{sorted(missing_lin)}."
+                    "SpectralLinear requires optimisation_parameters to include "
+                    f"{sorted(missing_lin)}."
                 )
             fermi_velocity = optimisation_parameters["fermi_velocity"]
             fermi_wavevector = optimisation_parameters["fermi_wavevector"]
-        else:
+
+        elif self._class == "SpectralQuadratic":
+            if "fermi_wavevector" not in optimisation_parameters:
+                raise ValueError(
+                    "SpectralQuadratic requires optimisation_parameters to include "
+                    "'fermi_wavevector'."
+                )
+            fermi_wavevector = optimisation_parameters["fermi_wavevector"]
+
             bare_mass = optimisation_parameters.get("bare_mass", None)
-            if bare_mass is None and hasattr(self, "_bare_mass"):
-                bare_mass = self._bare_mass
+            if bare_mass is None:
+                bare_mass = getattr(self, "_bare_mass", None)
+
+        else:
+            raise NotImplementedError(
+                f"_cost_function does not support class '{self._class}'."
+            )
 
         from . import create_model_function, MEM_core
 
@@ -1412,19 +1939,18 @@ class SelfEnergy:
         if lambda_el:
             if W is None:
                 if self._class == "SpectralQuadratic":
-                    kF0 = getattr(self, "_fermi_wavevector", None)
-                    if kF0 is None or bare_mass is None:
+                    if fermi_wavevector is None or bare_mass is None:
                         raise ValueError(
-                            "lambda_el is nonzero, but W is None and cannot " \
-                            "be inferred. Provide W (meV), or set " \
-                            "`self._fermi_wavevector` and pass `bare_mass`."
+                            "lambda_el is nonzero, but W is None and cannot be "
+                            "inferred. Provide W (meV), or pass both "
+                            "`fermi_wavevector` and `bare_mass`."
                         )
-                    W = (PREF * kF0**2 / bare_mass) * KILO
+                    W = (PREF * fermi_wavevector**2 / bare_mass) * KILO
                 else:
                     raise ValueError(
-                        "lambda_el was provided, but W is None. For " \
+                        "lambda_el was provided, but W is None. For "
                         "SpectralLinear you must provide W in meV."
-                        )
+                    )
 
             energies_el = energies_eV_masked * KILO
             real_el, imag_el = self._el_el_self_energy(
@@ -1462,9 +1988,10 @@ class SelfEnergy:
             dvec = imag_m
             wvec = imag_sig_m**(-2)
 
-        spectrum_in, alpha_select = self._chi2kink_a2f(
-            dvec, model_in, uvec, mu, wvec, V_Sigma, U, alpha_min, alpha_max,
-            alpha_num, a_guess, b_guess, c_guess, d_guess, f_chi_squared,
+        (spectrum_in, aval_select, fit_curve, guess_curve,
+            chi2kink_result) = self._chi2kink_a2f(
+            dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min, aval_max,
+            aval_num, g_guess, b_guess, c_guess, d_guess, f_chi_squared,
             t_criterion, iter_max, MEM_core,
         )
 
@@ -1487,55 +2014,234 @@ class SelfEnergy:
         )
 
         cost = (0.5 * chi_squared
-            - alpha_select * information_entropy
+            - aval_select * information_entropy
             + 0.5 * np.sum(np.log(2.0 * np.pi / wvec))
-            - 0.5 * spectrum_in.size * np.log(alpha_select))
+            - 0.5 * spectrum_in.size * np.log(aval_select))
 
         spectrum = spectrum_in * omega_num / omega_max
 
-        return (cost, spectrum, model, alpha_select)
+        return (cost, spectrum, model, aval_select)
 
 
     @staticmethod
-    def _chi2kink_a2f(dvec, model_in, uvec, mu, wvec, V_Sigma, U,
-                            alpha_min, alpha_max, alpha_num, a_guess, b_guess,
-                            c_guess, d_guess, f_chi_squared, t_criterion, 
-                            iter_max, MEM_core):
-        r"""Compute MEM spectrum using the chi2kink alpha-selection procedure.
+    def _chi2kink_a2f(dvec, model_in, uvec, mu, wvec, V_Sigma, U, aval_min,
+                    aval_max, aval_num, g_guess, b_guess, c_guess, d_guess,
+                    f_chi_squared, t_criterion, iter_max, MEM_core, *,
+                    plot=None):
+        r"""
+        Compute MEM spectrum using the chi2-kink aval-selection procedure.
 
-        Returns
-        -------
-        spectrum_in : ndarray
-            Selected spectrum from MEM_core evaluated at the chi2kink alpha.
+        Notes
+        -----
+        This routine contains extensive logic to detect failure modes of the
+        chi2-kink logistic fit, including (but not limited to):
+
+        - non-finite or non-positive chi² values,
+        - lack of meaningful parameter updates relative to the initial guess,
+        - absence of improvement in the residual sum of squares,
+        - numerical instabilities or overflows in the logistic model,
+        - invalid or non-finite aval selection.
+
+        Despite these safeguards, it is **not possible to guarantee** that all
+        failure modes are detected in a nonlinear least-squares problem.
+        Consequently, a reported success should be interpreted as a *necessary*
+        but *not sufficient* condition for physical or numerical reliability.
+
+        Callers **must** inspect the returned ``success`` flag (contained in
+        ``chi2kink_result``) before using the fitted curve, selected aval, or
+        MEM spectrum. When ``success`` is False, the returned quantities are
+        limited to those required for diagnostic plotting only.
         """
-        from . import (fit_leastsq, chi2kink_logistic)
+        from . import fit_least_squares, chi2kink_logistic
 
-        alpha_range = np.logspace(alpha_min, alpha_max, alpha_num)
-        chi_squared = np.empty_like(alpha_range, dtype=float)
+        aval_range = np.logspace(aval_min, aval_max, int(aval_num))
+        chi_squared = np.empty_like(aval_range, dtype=float)
 
-        for i, alpha in enumerate(alpha_range):
-            spectrum_in, uvec = MEM_core(dvec, model_in, uvec, mu, alpha, 
-                wvec, V_Sigma, U, t_criterion, iter_max)
-            
+        for i, aval in enumerate(aval_range):
+            spectrum_in, uvec = MEM_core(
+                dvec, model_in, uvec, mu, aval, wvec, V_Sigma, U,
+                t_criterion, iter_max
+            )
             T = V_Sigma @ (U.T @ spectrum_in)
             chi_squared[i] = wvec @ ((T - dvec) ** 2)
 
-        log_alpha = np.log10(alpha_range)
+        if (not np.all(np.isfinite(chi_squared))) or np.any(chi_squared <= 0.0):
+            raise ValueError(
+                "chi_squared contains non-finite or non-positive values."
+            )
+
+        log_aval = np.log10(aval_range)
         log_chi_squared = np.log10(chi_squared)
 
-        p0 = np.array([a_guess, b_guess, c_guess, d_guess], dtype=float)
-        pfit, pcov = fit_leastsq(
-            p0, log_alpha, log_chi_squared, chi2kink_logistic
+        p0 = np.array([g_guess, b_guess, c_guess, d_guess], dtype=float)
+        pfit, pcov, lsq_success = fit_least_squares(
+            p0, log_aval, log_chi_squared, chi2kink_logistic
         )
 
-        cout = pfit[2]
-        dout = pfit[3]
-        alpha_select = 10 ** (cout - f_chi_squared / dout)
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            guess_curve = chi2kink_logistic(log_aval, *p0)
 
-        spectrum_in, uvec = MEM_core(dvec, model_in, uvec, mu, alpha_select, 
-                        wvec, V_Sigma, U, t_criterion, iter_max)
+        # Start from the necessary requirement: least_squares must say success
+        success = bool(lsq_success)
 
-        return spectrum_in, alpha_select
+        # If the guess itself blows up, we can't trust anything
+        if not np.all(np.isfinite(guess_curve)):
+            success = False
+
+        fit_curve_tmp = None
+        if success:
+            pfit = np.asarray(pfit, dtype=float)
+
+            if np.allclose(pfit, p0, rtol=1e-12, atol=0.0):
+                success = False
+            else:
+                with np.errstate(over="ignore", invalid="ignore",
+                                 divide="ignore"):
+                    fit_curve_tmp = chi2kink_logistic(log_aval, *pfit)
+
+                if not np.all(np.isfinite(fit_curve_tmp)):
+                    success = False
+                else:
+                    r0 = guess_curve - log_chi_squared
+                    r1 = fit_curve_tmp - log_chi_squared
+                    sse0 = float(r0 @ r0)
+                    sse1 = float(r1 @ r1)
+
+                    tol = 1e-12 * max(1.0, sse0)
+                    if (not np.isfinite(sse1)) or (sse1 >= sse0 - tol):
+                        success = False
+
+        aval_select = None
+        fit_curve = None
+        spectrum_out = None
+
+        if success:
+            fit_curve = fit_curve_tmp
+
+            cout = float(pfit[2])
+            dout = float(pfit[3])
+            exp10 = cout - float(f_chi_squared) / dout
+
+            if (not np.isfinite(exp10)) or (exp10 < -308.0) or (exp10 > 308.0):
+                success = False
+                fit_curve = None
+            else:
+                with np.errstate(over="raise", invalid="raise"):
+                    aval_select = float(np.power(10.0, exp10))
+
+                spectrum_out, uvec = MEM_core(
+                    dvec, model_in, uvec, mu, aval_select, wvec, V_Sigma, U,
+                    t_criterion, iter_max
+                )
+
+        chi2kink_result = {
+            "aval_range": aval_range,
+            "chi_squared": chi_squared,
+            "log_aval": log_aval,
+            "log_chi_squared": log_chi_squared,
+            "p0": p0,
+            "pfit": pfit,
+            "pcov": pcov,
+            "success": bool(success),
+            "aval_select": aval_select,
+        }
+
+        return spectrum_out, aval_select, fit_curve, guess_curve, chi2kink_result
+
+
+    @staticmethod
+    def _trimmed_stdout(print_lines):
+        """Optionally tee stdout+stderr and replace final output with head/tail."""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _ctx():
+            if print_lines is None:
+                yield
+                return
+
+            n = int(print_lines)
+            import sys
+            import io
+
+            class _Tee:
+                def __init__(self, out_stream, err_stream, nlines):
+                    self.out_stream = out_stream
+                    self.err_stream = err_stream
+                    self.nlines = int(nlines)
+                    self.buf = io.StringIO()
+
+                def write(self, text):
+                    # Jupyter sometimes calls write with empty strings
+                    if text is None:
+                        return
+                    if self.nlines > 0:
+                        self.out_stream.write(text)
+                        self.out_stream.flush()
+                    self.buf.write(text)
+
+                def flush(self):
+                    self.out_stream.flush()
+
+                def err_write(self, text):
+                    if text is None:
+                        return
+                    if self.nlines > 0:
+                        self.err_stream.write(text)
+                        self.err_stream.flush()
+                    self.buf.write(text)
+
+                def err_flush(self):
+                    self.err_stream.flush()
+
+                def cleaned(self):
+                    lines = self.buf.getvalue().splitlines()
+                    if self.nlines <= 0:
+                        return ""
+
+                    if len(lines) <= 2 * self.nlines:
+                        return "\n".join(lines)
+
+                    head = lines[:self.nlines]
+                    tail = lines[-self.nlines:]
+                    omitted = len(lines) - 2 * self.nlines
+                    mid = f"... ({omitted} lines omitted) ..."
+                    return "\n".join(head + [mid] + tail)
+
+            stdout_orig = sys.stdout
+            stderr_orig = sys.stderr
+
+            tee = _Tee(stdout_orig, stderr_orig, n)
+
+            class _ErrProxy:
+                def write(self, text):
+                    tee.err_write(text)
+
+                def flush(self):
+                    tee.err_flush()
+
+            try:
+                sys.stdout = tee
+                sys.stderr = _ErrProxy()
+                yield
+            finally:
+                sys.stdout = stdout_orig
+                sys.stderr = stderr_orig
+
+                try:
+                    from IPython.display import clear_output
+                    clear_output(wait=True)
+                except Exception:
+                    pass
+
+                cleaned = tee.cleaned()
+                if cleaned:
+                    print(cleaned)
+                else:
+                    # Avoid a "blank cell" surprise.
+                    print("(output trimmed; nothing captured from stdout/stderr)")
+
+        return _ctx()
 
 
     @staticmethod

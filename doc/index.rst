@@ -18,8 +18,9 @@
    :caption: Tutorials
    :hidden:
 
-   notebooks/graphene
+   notebooks/verification
    notebooks/srtio3
+   notebooks/graphene
 
 .. toctree::
    :caption: More
