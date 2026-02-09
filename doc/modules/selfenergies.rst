@@ -1,5 +1,5 @@
 SelfEnergies
-========
+============
 
-.. automodule:: xarpes.selfenerqies
+.. automodule:: xarpes.selfenergies
    :members:
