@@ -33,6 +33,11 @@ bmap = xarpes.BandMap.from_np_arrays(intensities=intn, angles=angl, ekin=ekns,
 
 
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
+fig = bmap.plot(ax=ax)
+plt.show()
+
+
+fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
 fig = bmap.fit_fermi_edge(hnuminPhi_guess=30, background_guess=1e4,
                           integrated_weight_guess=3e4, angle_min=-6,
