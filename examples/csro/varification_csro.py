@@ -133,9 +133,9 @@ fig = bmap.plot(abscissa='momentum', ordinate='electron_energy',
 fig, spectrum, model, omega_range, aval_select = self_energy.extract_a2f(
     omega_min=1.0, omega_max=150, omega_num=500, omega_I=20, omega_M=130, 
     aval_min=1, aval_num=30, aval_max=9.5, lambda_el=0,
-    impurity_magnitude=120, h_n=0.03, 
-    f_chi_squared=-2.2,
-    g_guess=1.0, b_guess=3.0, c_guess=3.0, d_guess=1.5,
+    impurity_magnitude=120, h_n=0.3, 
+    f_chi_squared=2.5,
+    g_guess=3.5, b_guess=0.5, c_guess=3.0, d_guess=1.5,
     show=True, fig_close=False)
 
 plt.show()

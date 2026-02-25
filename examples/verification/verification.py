@@ -33,11 +33,6 @@ bmap = xarpes.BandMap.from_np_arrays(intensities=intn, angles=angl, ekin=ekns,
 
 
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
-fig = bmap.plot(ax=ax)
-plt.show()
-
-
-fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
 fig = bmap.fit_fermi_edge(hnuminPhi_guess=30, background_guess=1e4,
                           integrated_weight_guess=3e4, angle_min=-6,
@@ -47,6 +42,11 @@ fig = bmap.fit_fermi_edge(hnuminPhi_guess=30, background_guess=1e4,
 
 print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
       + f'{1.96 * bmap.hnuminPhi_std:.5f}' + ' eV.')
+
+
+fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
+fig = bmap.plot(ax=ax)
+plt.show()
 
 
 angle_min = 2
@@ -126,6 +126,7 @@ fig, spectrum, model, omega_range, aval_select = self_energy.extract_a2f(
     omega_min=1.0, omega_max=80, omega_num=250, omega_I=20, omega_M=60, 
     aval_min=1.5, aval_num=10, aval_max=9.5, lambda_el=0.1132858,
     impurity_magnitude=10.041243, h_n=0.0803366,
+    f_chi_squared=0,
     g_guess=1.0, b_guess=3.0, c_guess=3.0, d_guess=1.5,
     show=True, fig_close=False)
 
@@ -209,3 +210,5 @@ with xarpes.trim_notebook_output(print_lines=10):
                 vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
                 converge_iters=100, tole=1e-8, scale_mb=0.1, scale_imp=0.1, scale_kF=0.01,
                 scale_lambda_el=0.1, scale_hn=0.1, print_lines=10)
+
+
