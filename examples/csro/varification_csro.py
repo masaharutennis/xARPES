@@ -154,25 +154,30 @@ fig = plt.figure(figsize=(10, 8)); ax1 = fig.add_subplot(111); ax2 = ax1.twinx()
 
 # ax1.set_ylim([0, 0.5]); ax2.set_ylim([0, 40])
 
-self_energy.plot_spectra( ax=ax1, abscissa="reversed", show=False, fig_close=False)
-self_energy.plot_both(ax=ax2, scale="meV", resolution_range='applied', show=False, fig_close=False)
+self_energy.plot_spectra(ax=ax1, abscissa="reversed", show=False, fig_close=False)
+self_energy.plot_real(ax=ax2, scale="meV", resolution_range="applied", show=False, fig_close=False)
 
 # --- Change colours for spectra
 a2f_line, model_line = ax1.get_lines()[-2:]
 a2f_line.set_color("mediumvioletred")
-model_line.set_color("darkgoldenrod"); model_line.set_linestyle("--")
+model_line.set_color("darkgoldenrod")
+model_line.set_linestyle("--")
 
-# --- Change colours for self-energy lines
-real_line, imag_line = ax2.get_lines()[-2:]
-real_line.set_color("tab:blue"); imag_line.set_color("tab:orange")
+# --- Change colour for real self-energy line only
+real_line = ax2.get_lines()[-1]
+real_line.set_color("tab:blue")
 
-# Change colours for error bars
-real_err, imag_err = ax2.collections[-2:]
-real_err.set_color(real_line.get_color()); imag_err.set_color(imag_line.get_color())
+# --- Change colour for real self-energy error bars only
+real_err = ax2.collections[-1]
+real_err.set_color(real_line.get_color())
 
 # --- Overwrite the legend with a custom legend
-for ax in (ax1, ax2): ax.get_legend() and ax.get_legend().remove()
-h1, l1 = ax1.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+for ax in (ax1, ax2):
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
+
+h1, l1 = ax1.get_legend_handles_labels()
+h2, l2 = ax2.get_legend_handles_labels()
 ax1.legend(h1 + h2, l1 + l2, ncol=2)
 
 plt.show()
@@ -191,17 +196,3 @@ with xarpes.trim_notebook_output(print_lines=10):
             scale_mb=0.005, scale_imp=10, scale_kF=0.001,
             scale_lambda_el=1.0e-5, scale_hn=0.1,
         )
-
-# Following the recommended procedure, we perform a final optimisation with very tight criteria, for the purpose of further narrowing down the solution.
-
-# With the tested combination of packages, the result is a tiny bit closer to the true solution for bare_mass, impurity_magnitude, and lambda_el.
-
-with xarpes.trim_notebook_output(print_lines=10):
-    spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(
-                omega_min=1.0, omega_max=200, omega_num=500, omega_I=10, omega_M=190,
-                aval_min=1.0, aval_max=10, sigma_svd=1e-4,
-                bare_mass=-0.01022522839, fermi_wavevector=0.09275671279, h_n=1.698533472, 
-                impurity_magnitude=0.1016326705, lambda_el=0.013228474,
-                vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
-                converge_iters=100, tole=1e-8, scale_mb=0.1, scale_imp=0.1, scale_kF=0.01,
-                scale_lambda_el=0.1, scale_hn=0.1, print_lines=10)
