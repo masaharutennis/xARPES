@@ -37,7 +37,7 @@ xarpes.plot_settings('default')
 script_dir = xarpes.set_script_dir()
 
 dfld = 'data_sets'           # Folder containing the data
-flnm = 'csro_xarpes_demo' # Name of the file
+flnm = 'csro_fixed' # Name of the file
 extn = '.ibw'         # Extension of the file
 
 data_file_path = os.path.join(script_dir, dfld, flnm + extn)
@@ -59,8 +59,6 @@ bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.001,
 
 bmap = xarpes.BandMap.from_ibw_file(data_file_path, energy_resolution=0.01, 
         angle_resolution=0.1, temperature=50)
-
-bmap.shift_angles(shift=-5.2)
 
 fig = plt.figure(figsize=(8, 5)); ax = fig.gca()
 
@@ -85,8 +83,8 @@ print('The optimised hnu - Phi=' + f'{bmap.hnuminPhi:.4f}' + ' +/- '
 ```{python}
 # %matplotlib inline
 
-angle_min = 2.5
-angle_max = 12.5
+angle_min = 1.25
+angle_max = 1.75
 
 energy_range = [-0.20, 0.0001]
 energy_value = -0.10
@@ -96,8 +94,8 @@ k_0 = 0
 mdcs = xarpes.MDCs(*bmap.mdc_set(angle_min, angle_max, energy_range=energy_range))
 
 guess_dists = xarpes.CreateDistributions([
-xarpes.Constant(offset=900),
-xarpes.SpectralQuadratic(amplitude=20, peak=7.5, broadening=0.009,
+xarpes.Constant(offset=850),
+xarpes.SpectralQuadratic(amplitude=0.2, peak=1.55, broadening=0.00009,
             center_wavevector=k_0, name='Right_branch', index='1')
 ])
 
@@ -125,7 +123,7 @@ fig = mdcs.fit_selection(distributions=guess_dists, ax=ax)
 fig = plt.figure(figsize=(6, 5)); ax = fig.gca()
 
 self_energy = xarpes.SelfEnergy(*mdcs.expose_parameters(select_label='Right_branch_1', 
-                                bare_mass=-2, fermi_wavevector=0.37, side='right'))
+                                bare_mass=-0.01557611009, fermi_wavevector=0.09500534275, side='right'))
 
 fig = self_energy.plot_both(ax=ax, scale='meV')
 
@@ -171,11 +169,12 @@ gradual evolution.
 # %matplotlib inline
 
 fig, spectrum, model, omega_range, aval_select = self_energy.extract_a2f(
-    omega_min=1.0, omega_max=150, omega_num=500, omega_I=20, omega_M=130, 
-    aval_min=1, aval_num=30, aval_max=9.5, lambda_el=0,
-    impurity_magnitude=120, h_n=0.3, 
-    f_chi_squared=2.5,
-    g_guess=3.5, b_guess=0.5, c_guess=3.0, d_guess=1.5,
+    parts="real",
+    omega_min=1.0, omega_max=200, omega_num=500, omega_I=10, omega_M=190, 
+    aval_min=0, aval_num=30, aval_max=9.5, lambda_el=1.892698978e-05,
+    impurity_magnitude=58.73509854, h_n=0.4738482189, 
+    f_chi_squared=2.5, # default
+    g_guess=2.0, b_guess=1.5, c_guess=3.0, d_guess=1.5,
     show=True, fig_close=False)
 
 plt.show()
@@ -230,30 +229,16 @@ In the following cell, we start from the optimal solution. Unsurprisingly, the o
 ```{python}
 with xarpes.trim_notebook_output(print_lines=10):
     spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(
-            omega_min=1.0, omega_max=80, omega_num=250, omega_I=20, omega_M=60,
-            aval_min=3.0, aval_max=11.0, bare_mass=1.597636665,
-            fermi_wavevector=0.2499774217, h_n=0.081811739,
-            impurity_magnitude=10.0379498, lambda_el=0.1054932517,
+            parts="real",
+            omega_min=1.0, omega_max=200, omega_num=500, omega_I=10, omega_M=190,
+            aval_min=1.0, aval_max=10,bare_mass=-0.02,
+            fermi_wavevector=0.094, h_n=0.5,
+            impurity_magnitude=70, lambda_el=0,
             vary=("impurity_magnitude", "lambda_el", "fermi_wavevector",
                   "bare_mass", "h_n"),
-            scale_mb=0.01, scale_imp=0.1, scale_kF=0.001,
-            scale_lambda_el=0.1, scale_hn=0.1,
+            scale_mb=0.005, scale_imp=10, scale_kF=0.001,
+            scale_lambda_el=1.0e-5, scale_hn=0.1,
         )
-```
-
-In the following cell, we start from a much less probable solution, showing that the code can occasionally heavily improve on the solution.
-
-The optimisation has been tested against Python v3.10.12, NumPy v2.2.6, and SciPy v1.15.3. Other combinations of these packages still have to be tested.
-
-```{python}
-with xarpes.trim_notebook_output(print_lines=10):
-    spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(omega_min=1.0,
-                omega_max=80, omega_num=250, omega_I=20, omega_M=60,
-                aval_min=3.0, aval_max=11.0, bare_mass=1.74625, fermi_wavevector=0.250125,
-                h_n=0.09, impurity_magnitude=9.1, lambda_el=0.22, sigma_svd=0.1,
-                vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
-                converge_iters=100, tole=1e-8, scale_mb=0.1, scale_imp=1.0, scale_kF=0.001,
-                scale_lambda_el=0.1, scale_hn=0.01, print_lines=10)
 ```
 
 Following the recommended procedure, we perform a final optimisation with very tight criteria, for the purpose of further narrowing down the solution.
@@ -262,11 +247,11 @@ With the tested combination of packages, the result is a tiny bit closer to the 
 
 ```{python}
 with xarpes.trim_notebook_output(print_lines=10):
-    spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(omega_min=1.0,
-                omega_max=80, omega_num=250, omega_I=20, omega_M=60,
-                aval_min=1.0, aval_max=9.0, sigma_svd=1e-4,
-                bare_mass=1.597636093, fermi_wavevector=0.2499774208, h_n=0.08181151626, 
-                impurity_magnitude=10.03795642, lambda_el=0.1054945571,
+    spectrum, model, omega_range, aval_select, cost, params = self_energy.bayesian_loop(
+                omega_min=1.0, omega_max=200, omega_num=500, omega_I=10, omega_M=190,
+                aval_min=1.0, aval_max=10, sigma_svd=1e-4,
+                bare_mass=-0.01022522839, fermi_wavevector=0.09275671279, h_n=1.698533472, 
+                impurity_magnitude=0.1016326705, lambda_el=0.013228474,
                 vary=("impurity_magnitude", "lambda_el", "fermi_wavevector", "bare_mass", "h_n"), 
                 converge_iters=100, tole=1e-8, scale_mb=0.1, scale_imp=0.1, scale_kF=0.01,
                 scale_lambda_el=0.1, scale_hn=0.1, print_lines=10)

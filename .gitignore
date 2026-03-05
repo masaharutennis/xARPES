@@ -185,3 +185,6 @@ examples/Rmd2py.py
 
 # macos
 .DS_Store
+
+# original files
+original_scripts/
