@@ -182,3 +182,9 @@ cython_debug/
 examples/Rmd2ipynb.py
 examples/ipynb2Rmd2py.py
 examples/Rmd2py.py
+
+# macos
+.DS_Store
+
+# original files
+original_scripts/

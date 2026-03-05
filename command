@@ -1,15 +1,15 @@
-# venv仮想環境のコマンド
+# venv virtual environment commands
 
-## 起動（アクティベート）
+## activate
 source venv/bin/activate
 
-## 停止（デアクティベート）
+## deactivate
 deactivate
 
-# ファイル変換コマンド
+# file conversion commands
 
-## .ipynb → .Rmd → .py に変換（venv環境で実行）
+## .ipynb → .Rmd → .py (venv environment)
 source venv/bin/activate && python examples/ipynb2Rmd2py.py
 
-## .Rmd → .ipynb に変換（venv環境で実行）
+## .Rmd → .ipynb (venv environment)
 source venv/bin/activate && python examples/Rmd2ipynb.py
